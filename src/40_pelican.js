@@ -266,8 +266,30 @@ const Pelican = (() => {
     else { const u = (c - S) / (2 - S); plant(k + 2, _v2); const w = smoother(.02, .97, u); _v.lerp(_v2, w); y = liftK(u); const sd = i ? 1 : -1; phi = lerp(lerp(.95, 1.35, sm(0, .28, u)), -.26, sm(.34, .94, u)); spr = lerp(.7, .30, sm(0, .3, u)); spr = lerp(spr, 1.06, sm(.62, 1, u)); curl = .85 * sm(.05, .35, u) * (1 - sm(.55, .9, u)); o.out = .07 * Math.sin(PI * u) * sd; }
     if (down) o.out = 0; const rx = _v.x - tp.pos.x, rz = _v.z - tp.pos.z, cy = Math.cos(tp.yaw), sy = Math.sin(tp.yaw); o.p.set(rx * cy - rz * sy, y - tp.pos.y, rx * sy + rz * cy + o.out); o.phi = phi; o.spr = spr; o.curl = curl; o.down = down; o.c = c; return o; }
 
+  function rideGait(i, st, out) {
+    const c = mod(st.phase - i, 2);
+    const stance = lerp(1.24, .76, st.run);
+    const stride = st.stepLength * st.direction;
+    const gait = st.gait;
+    const swing = clamp((c - stance) / (2 - stance));
+    const x = .10 + gait * stride * (stance * .5 - c + 2 * smoother(.02, .97, swing));
+    const z = (i ? 1 : -1) * (.235 + .05 * gait * Math.sin(PI * swing));
+    const cy = Math.cos(st.yaw), sy = Math.sin(st.yaw);
+    const worldX = st.pos.x + x * cy + z * sy;
+    const worldZ = st.pos.z - x * sy + z * cy;
+    const ground = Arch.ground(worldX, worldZ);
+    const rise = clamp(ground - st.pos.y, -.22, .33);
+    out.p.set(x, rise + liftK(swing) * gait, z);
+    const heel = lerp(-.17, .67, sm(.30, 1, c / stance));
+    const swingPitch = lerp(.67, -.17, sm(.18, .95, swing));
+    out.phi = (c < stance ? heel : swingPitch) * gait * (st.direction < 0 ? -.45 : 1);
+    out.spr = 1 - .26 * gait * Math.sin(PI * swing);
+    out.curl = .45 * gait * Math.sin(PI * swing);
+    out.down = c < stance || gait < .05;
+  }
+
   // ---- performance: what it does when -----------------------------------------------------------------------------------------------------------------------
-  const EV = { honk: [], gulp: [], open: [] };
+  const EV = { honk: [], gulp: [], open: [] }, rideHonks = [];
   const honks = t => { const L = EV.honk.filter(e => t >= e - .2 && t < e + 1.6); if (Math.abs(t - CUE.HONK - .6) < 1) L.push(CUE.HONK); return L; }, gulps = t => { const L = EV.gulp.filter(e => t >= e && t < e + 1.7); if (t >= CUE.GULP && t < CUE.GULP + 1.7) L.push(CUE.GULP); return L; }, opens = t => { const L = EV.open.filter(e => t >= e[0] - .1 && t < e[1] + .3); if (t > CUE.GULP - .8 && t < CUE.GULP + .3) L.push([CUE.GULP - .7, CUE.GULP]); return L; };
   // glances: [from, to, yaw (left +), pitch, roll] in the walk; smooth in, hold, smooth out
   const GL = [[1.2, 2.6, .10, .02, .05], [3.2, 4.6, -.16, .10, 0], [5.0, 6.6, .20, .16, .10], [7.2, 8.6, .34, -.04, -.06], [9.2, 11.7, -.62, .26, .12], [12.4, 13.4, .16, 0, -.10], [14.1, 16.4, .22, -.34, .10], [17.6, 18.8, -.30, .04, 0], [22.6, 23.8, .28, .06, -.12], [24.9, 27.0, .52, .06, .16], [29.0, 30.0, .10, .24, 0], [30.6, 32.0, -.42, -.10, .10], [33.4, 35.0, .32, -.06, .08], [36.0, 37.0, -.24, .12, -.10], [38.4, 40.0, .40, .0, .12], [40.9, 42.3, -.44, -.04, .06], [45.2, 46.6, .36, .04, .10], [49.2, 50.2, .18, .12, 0], [55.6, 57.4, .34, -.10, .08], [59.0, 60.6, -.30, -.16, -.06], [62.6, 64.0, .28, .06, .06], [65.0, 67.0, .46, .06, .14], [68.4, 69.6, -.30, -.16, 0], [75.2, 77.2, .48, .04, .14], [78.4, 80.2, -.22, .10, -.08]];
@@ -278,36 +300,46 @@ const Pelican = (() => {
   const glideAt = t => { const e = Score.last('flap', t); if (!e || t > T_TOUCH) return 0; const T = e.d, x = t - e.t; return T > 1.5 ? sm(.45, 1.0, x) * (1 - sm(T - .5, T, x)) : 0; };
 
   const POSES = { walk: [1.07, 1.73, .965, 2.06, .80, 2.34, 1.20, 2.85, -.35], run: [1.06, 1.62, 1.21, 1.86, 1.19, 2.06, 1.52, 2.50, -.22], fly: [1.18, 1.60, 1.31, 1.84, 1.00, 1.95, 1.03, 2.42, -.27], ski: [1.05, 1.74, .96, 2.02, .80, 2.28, 1.12, 2.70, -.30], float: [1.12, 1.70, 1.0, 1.98, .80, 2.24, 1.16, 2.72, -.42], honk: [1.0, 1.78, .96, 2.12, .94, 2.46, 1.14, 3.18, .34], gulp: [1.08, 1.72, 1.0, 1.98, .86, 2.22, 1.26, 2.70, .04], reach: [1.13, 1.70, 1.12, 1.94, 1.02, 2.14, 1.40, 2.56, -.10], preen: [1.09, 1.72, 1.0, 2.04, .82, 2.38, 1.28, 2.62, -1.15] };
-  const PW = new Float32Array(9), tp = {}; let tPose = null, look = { v: null, w: 0, y: 0, p: 0, k: 0 }; const _hp = V3(), _lm = V3();
+  const PW = new Float32Array(9), look = { v: null, w: 0, y: 0, p: 0, k: 0 }; const _hp = V3(), _lm = V3();
   const Mb = new THREE.Matrix4(), Ms = new THREE.Matrix4(), Mh = new THREE.Matrix4(), Mrel = new THREE.Matrix4(), qh = new THREE.Quaternion(), qr = new THREE.Quaternion(), qi = new THREE.Quaternion(), sp3 = { x: 0, y: 0, z: 0, px: 0, py: 0, pz: 0, vx: 0, vy: 0, vz: 0, init: false }, PSt = { x: 0, vx: 0, z: 0, vz: 0, d: 0, vd: 0 }, HL = { x: 0, vx: 0, y: 0, vy: 0, z: 0, vz: 0, r: 0, vr: 0 };
   const compose = (M, x, y, z, rx, ry, rz) => { _e.set(rx, ry, rz, 'YZX'); _q.setFromEuler(_e); _m.compose(_v.set(x, y, z), _q, _v3.set(1, 1, 1)); M.copy(_m).multiply(_m2.makeTranslation(-x * 0, -PIVY, 0)); };
   const state = { open: 0, f: 0 };
 
   function update(ctx) {
-    const t = ctx.t, st = ctx.st, dt = Math.min(.05, ctx.dt || 1 / 60); tPose = Path.bird(t); const T = tPose, p = T.phase;
-    group.position.copy(st.pos); const yEnd = Math.atan2(-.02, -1) + TAU, yS = t > 76 ? lerp(t > 77.55 ? Path.bird(77.55).yaw : T.yaw, yEnd, smoother(76.2, 78.8, t)) - T.yaw : 0; group.rotation.set(st.roll, st.yaw + yS, st.pitch, 'YZX');
+    const t = ctx.t, st = ctx.st, ride = ctx.freeRide, dt = Math.min(.05, ctx.dt || 1 / 60);
+    const T = ride ? st : Path.bird(t), p = T.phase;
+    group.position.copy(st.pos); const yEnd = Math.atan2(-.02, -1) + TAU, yS = !ride && t > 76 ? lerp(t > 77.55 ? Path.bird(77.55).yaw : T.yaw, yEnd, smoother(76.2, 78.8, t)) - T.yaw : 0; group.rotation.set(st.roll, st.yaw + yS, st.pitch, 'YZX');
     // ---- weights
-    const kRun = sm(T_RUN - .1, T_RUN + 1.0, t), kAir = sm(T_OFF - .05, T_OFF + .45, t), kGnd = 1 - kAir, kFly = sm(T_OFF + .1, T_OFF + 1.7, t) * (1 - sm(T_TOUCH - 1.0, T_TOUCH, t)), kSki = sm(T_TOUCH - 1.1, T_TOUCH - .1, t) * (1 - sm(T_TOUCH + 1.3, T_TOUCH + 3.0, t)), kFl = sm(T_TOUCH + 1.2, T_TOUCH + 3.2, t), kBrake = sm(T_TOUCH - 1.25, T_TOUCH - .45, t) * (1 - sm(T_TOUCH + .25, T_TOUCH + 1.3, t));
-    const fl = flapAt(t), fh = flapAt(t - .075), vf = (flapAt(t + .012) - flapAt(t - .012)) / .024, vfl = (flapAt(t - .05) - flapAt(t - .075)) / .025, gl = glideAt(t);
-    const hon = honks(t), gul = gulps(t), opn = opens(t); let hk = 0, hA = 0, hFl = 0, hShake = 0, hHop = 0, hOpen = 0; for (const e of hon) { const u = t - e; hk = Math.max(hk, sm(-.05, .13, u) * (1 - sm(.62, 1.15, u))); hA = Math.max(hA, sm(-.2, -.06, u) * (1 - sm(-.04, .08, u))); hOpen = Math.max(hOpen, sm(-.03, .09, u) * (1 - sm(.55, .86, u))); hFl = Math.max(hFl, sm(-.02, .20, u) * (1 - sm(.50, 1.15, u))); hShake += sm(.05, .25, u) * Math.exp(-Math.max(0, u - .2) * 3.2) * Math.sin(u * TAU * 8.5) * (u > 0 ? 1 : 0); hHop += u > .04 && u < .46 ? Math.sin(PI * (u - .04) / .42) * .13 : u >= .46 ? -.05 * Math.exp(-(u - .46) * 7) * Math.cos((u - .46) * 16) * sm(.46, .50, u) : 0; }
+    const kRun = ride ? st.run : sm(T_RUN - .1, T_RUN + 1.0, t);
+    const kAir = ride ? st.air : sm(T_OFF - .05, T_OFF + .45, t), kGnd = 1 - kAir;
+    const kFl = ride ? st.float : sm(T_TOUCH + 1.2, T_TOUCH + 3.2, t);
+    const kBrake = ride ? Number(st.landing) * (1 - sm(.65, 5.5, st.altitude)) * kAir : sm(T_TOUCH - 1.25, T_TOUCH - .45, t) * (1 - sm(T_TOUCH + .25, T_TOUCH + 1.3, t));
+    const kFly = ride ? kAir * (1 - kFl) * (1 - kBrake * .7) : sm(T_OFF + .1, T_OFF + 1.7, t) * (1 - sm(T_TOUCH - 1.0, T_TOUCH, t));
+    const kSki = ride ? kBrake * (1 - kFl) * .6 : sm(T_TOUCH - 1.1, T_TOUCH - .1, t) * (1 - sm(T_TOUCH + 1.3, T_TOUCH + 3.0, t));
+    const fl = ride ? st.flap : flapAt(t), fh = ride ? st.flapLag : flapAt(t - .075), vf = ride ? st.flapSpeed : (flapAt(t + .012) - flapAt(t - .012)) / .024, vfl = ride ? st.flapLagSpeed : (flapAt(t - .05) - flapAt(t - .075)) / .025, gl = ride ? st.glide : glideAt(t);
+    const hon = ride ? rideHonks.filter(e => st.t >= e - .2 && st.t < e + 1.6).map(e => t + e - st.t) : honks(t);
+    const gul = ride ? [] : gulps(t), opn = ride ? [] : opens(t); let hk = 0, hA = 0, hFl = 0, hShake = 0, hHop = 0, hOpen = 0; for (const e of hon) { const u = t - e; hk = Math.max(hk, sm(-.05, .13, u) * (1 - sm(.62, 1.15, u))); hA = Math.max(hA, sm(-.2, -.06, u) * (1 - sm(-.04, .08, u))); hOpen = Math.max(hOpen, sm(-.03, .09, u) * (1 - sm(.55, .86, u))); hFl = Math.max(hFl, sm(-.02, .20, u) * (1 - sm(.50, 1.15, u))); hShake += sm(.05, .25, u) * Math.exp(-Math.max(0, u - .2) * 3.2) * Math.sin(u * TAU * 8.5) * (u > 0 ? 1 : 0); hHop += u > .04 && u < .46 ? Math.sin(PI * (u - .04) / .42) * .13 : u >= .46 ? -.05 * Math.exp(-(u - .46) * 7) * Math.cos((u - .46) * 16) * sm(.46, .50, u) : 0; }
     let gOpen = 0, gTilt = 0, gSnap = 0, gLs = 0, gLa = 0, gPa = 0, gPs = .3, gJoy = 0; for (const e of opn) { const a = e[0], b = e[1]; gOpen = Math.max(gOpen, sm(a, lerp(a, b, .62), t) * (1 - sm(b, b + .085, t))); } for (const e of gul) { const u = t - e; gSnap += ring(t, e + .05, 5.2, 7.5); gTilt = Math.max(gTilt, sm(.16, .42, u) * (1 - sm(.78, 1.25, u))); gPa = Math.max(gPa, sm(.0, .07, u) * (1 - sm(.40, .62, u))); gPs = lerp(.52, .06, sm(.10, .60, u)); gLa = Math.max(gLa, sm(.46, .58, u) * (1 - sm(1.05, 1.32, u))); gLs = lerp(1.0, .06, sm(.48, 1.30, u)); gJoy += u > 1.0 ? Math.exp(-(u - 1.0) * 4) * Math.sin((u - 1) * 30) : 0; }
-    const reach = opn.length ? sm(opn[0][0], opn[0][1] - .12, t) * (1 - sm(opn[0][1] + .05, opn[0][1] + .35, t)) : 0, pr = PREEN.reduce((a, q) => Math.max(a, sm(q[0], q[0] + .5, t) * (1 - sm(q[1] - .45, q[1], t))), 0) * kGnd, shuf = SHUF.reduce((a, s) => a + (t > s && t < s + .9 ? Math.sin(PI * (t - s) / .9) * (.55 + .45 * Math.sin((t - s) * 34)) : 0), 0), wag = WAG.reduce((a, s) => a + (t > s && t < s + .8 ? Math.sin(PI * (t - s) / .8) * Math.sin((t - s) * 44) : 0), 0);
+    const reach = opn.length ? sm(opn[0][0], opn[0][1] - .12, t) * (1 - sm(opn[0][1] + .05, opn[0][1] + .35, t)) : 0, pr = ride ? 0 : PREEN.reduce((a, q) => Math.max(a, sm(q[0], q[0] + .5, t) * (1 - sm(q[1] - .45, q[1], t))), 0) * kGnd, shuf = ride ? 0 : SHUF.reduce((a, s) => a + (t > s && t < s + .9 ? Math.sin(PI * (t - s) / .9) * (.55 + .45 * Math.sin((t - s) * 34)) : 0), 0), wag = ride ? 0 : WAG.reduce((a, s) => a + (t > s && t < s + .8 ? Math.sin(PI * (t - s) / .8) * Math.sin((t - s) * 44) : 0), 0);
     // ---- body: heavy waddle locked to the steps
-    const le = Score.last('step', t), dStep = le ? t - le.t : 9, imp = kGnd * Math.exp(-dStep * 11) * Math.sin(Math.min(dStep * 24, 8)), bump = ring(t, CUE.BUMP, 2.6, 4.2) * kGnd, A = kGnd * lerp(1, .62, kRun), c1 = Math.cos(PI * (p - .60)), s2 = Math.cos(TAU * (p - .14));
+    const le = ride ? null : Score.last('step', t);
+    const gaitWeight = ride ? st.gait : 1;
+    const dStep = ride && st.speed > .1 ? fract(p) * st.stepLength / st.speed : le ? t - le.t : 9;
+    const imp = kGnd * gaitWeight * Math.exp(-dStep * 11) * Math.sin(Math.min(dStep * 24, 8)), bump = ride ? 0 : ring(t, CUE.BUMP, 2.6, 4.2) * kGnd, A = kGnd * gaitWeight * lerp(1, .62, kRun), c1 = Math.cos(PI * (p - .60)), s2 = Math.cos(TAU * (p - .14));
     const breath = Math.sin(t * 2.0) * .5 + .5, sw = kFl * Math.sin(t * 1.25) , pd = kFl * Math.sin(t * 2.4);
-    const heave = (1 - kGnd) * (-.075 * flapAt(t - .06) * (1 - kFl)) * (1 - kSki * .5);
-    const sinkY = keyedCR3(t), bob = -.046 * s2 * A * lerp(1, 1.3, kRun) - .026 * imp + .055 * bump + hHop - .05 * hA;
-    const roll = -.092 * c1 * A + .012 * hShake + .02 * sw + .02 * Math.sin(t * .83) * kFl, yawB = -.070 * Math.cos(PI * p) * A + .02 * Math.sin(t * .6) * kFl, pitchB = .020 * Math.sin(TAU * (p - .05)) * A - .085 * kRun * kGnd + .07 * hk - .02 * hA + .035 * sw * .6 + (1 - kGnd) * (.05 * flapAt(t - .04) * (1 - kFl)) + .16 * kBrake + .03 * gTilt - .05 * bump, swayZ = -.058 * c1 * A, surge = .018 * Math.sin(TAU * (p - .2)) * A;
-    const crouch = -.07 * sm(T_OFF - .34, T_OFF - .12, t) * (1 - sm(T_OFF - .1, T_OFF + .12, t)) - .05 * kRun * kGnd;
+    const heave = (1 - kGnd) * (-.075 * (ride ? fh : flapAt(t - .06)) * (1 - kFl)) * (1 - kSki * .5);
+    const sinkY = ride ? -.88 * kFl : keyedCR3(t), bob = -.046 * s2 * A * lerp(1, 1.3, kRun) - .026 * imp + .055 * bump + hHop - .05 * hA;
+    const roll = -.092 * c1 * A + .012 * hShake + .02 * sw + .02 * Math.sin(t * .83) * kFl, yawB = -.070 * Math.cos(PI * p) * A + .02 * Math.sin(t * .6) * kFl, pitchB = .020 * Math.sin(TAU * (p - .05)) * A - .085 * kRun * kGnd + .07 * hk - .02 * hA + .035 * sw * .6 + (1 - kGnd) * (.05 * (ride ? fh : flapAt(t - .04)) * (1 - kFl)) + .16 * kBrake + .03 * gTilt - .05 * bump, swayZ = -.058 * c1 * A, surge = .018 * Math.sin(TAU * (p - .2)) * A;
+    const crouch = (ride ? 0 : -.07 * sm(T_OFF - .34, T_OFF - .12, t) * (1 - sm(T_OFF - .1, T_OFF + .12, t))) - .05 * kRun * kGnd;
     const fl0 = .012 * Math.sin(t * 1.7) * kFl + .008 * Math.sin(t * 2.9 + 1) * kFl;
     compose(Ms, 0, PIVY + sinkY + crouch, 0, 0, 0, -.085 * kRun * kGnd + .16 * kBrake); compose(Mb, surge, PIVY + sinkY + crouch + bob + heave + fl0, swayZ, roll, yawB, pitchB); body.matrix.copy(Mb); body.matrixWorldNeedsUpdate = true;
     const sq = -.016 * imp - .02 * bump - .03 * hA + .025 * hk; torsoG.scale.set(1 - sq * .5, 1 + sq + .006 * breath, 1 - sq * .6 + .010 * breath); torsoG.position.y = PIVY * (1 - torsoG.scale.y) * .6;
     // ---- feather ruffles
-    const bs = Score.last('bass', t); UF.uRip.value.set(dStep, .12 * kGnd, bs ? t - bs.t : 9, (bs ? bs.v : 0) * .07 * (1 - kFly)); UF.uRuf.value.set(.02 + .04 * breath * .5 + .16 * hk + .10 * Math.max(0, gJoy) + .10 * Math.abs(shuf) + .12 * Math.max(0, bump) + .06 * kBrake, lerp(.02, .10, kFly) + .20 * gl * kFly + .07 * kRun * kGnd + .16 * kBrake + .10 * Math.abs(hShake), 0, 0); UN.uNR.value.set(.10 * breath + .55 * hk + .5 * gTilt, 1 + kFly * 1.2);
+    const bs = Score.last('bass', t); UF.uRip.value.set(dStep, .12 * kGnd * gaitWeight, bs ? t - bs.t : 9, (bs ? bs.v : 0) * .07 * (1 - kFly)); UF.uRuf.value.set(.02 + .04 * breath * .5 + .16 * hk + .10 * Math.max(0, gJoy) + .10 * Math.abs(shuf) + .12 * Math.max(0, bump) + .06 * kBrake, lerp(.02, .10, kFly) + .20 * gl * kFly + .07 * kRun * kGnd + .16 * kBrake + .10 * Math.abs(hShake), 0, 0); UN.uNR.value.set(.10 * breath + .55 * hk + .5 * gTilt, 1 + kFly * 1.2);
     // ---- neck + head
-    const nWalk = Math.max(0, 1 - Math.max(kRun * kGnd, 0) - kFly - kSki - kFl), W0 = [['walk', Math.max(nWalk, 0)], ['run', kRun * (1 - kFly) * (1 - sm(T_OFF + .4, T_OFF + 1.8, t))], ['fly', kFly], ['ski', kSki], ['float', kFl]]; let sum = 0; PW.fill(0); for (const [n, w] of W0) { sum += w; for (let i = 0; i < 9; i++) PW[i] += POSES[n][i] * w; } for (let i = 0; i < 9; i++) PW[i] /= sum;
+    const nWalk = Math.max(0, 1 - Math.max(kRun * kGnd, 0) - kFly - kSki - kFl), W0 = [['walk', Math.max(nWalk, 0)], ['run', kRun * (1 - kFly) * (ride ? 1 : 1 - sm(T_OFF + .4, T_OFF + 1.8, t))], ['fly', kFly], ['ski', kSki], ['float', kFl]]; let sum = 0; PW.fill(0); for (const [n, w] of W0) { sum += w; for (let i = 0; i < 9; i++) PW[i] += POSES[n][i] * w; } for (let i = 0; i < 9; i++) PW[i] /= sum;
     const ov = (n, w) => { if (w > 0) for (let i = 0; i < 9; i++) PW[i] = lerp(PW[i], POSES[n][i], w); }; ov('preen', pr); ov('reach', reach); ov('gulp', gTilt); ov('honk', hk);
-    let gy = 0, gp = 0, gr = 0; for (const q of GL) { if (t < q[0] - .1 || t > q[1] + .5) continue; const w = smoother(q[0], q[0] + .45, t) * (1 - smoother(q[1] - .1, q[1] + .42, t)); gy += q[2] * w; gp += q[3] * w; gr += q[4] * w; } const calm = (1 - pr) * (1 - reach) * (1 - hk) * (1 - gTilt); gy = gy * calm + .05 * Math.sin(t * .73) + .03 * Math.sin(t * 1.31 + 2); gp = gp * calm + .025 * Math.sin(t * .91 + 1) - .03 * kRun; gr *= calm;
+    let gy = 0, gp = 0, gr = 0; if (!ride) for (const q of GL) { if (t < q[0] - .1 || t > q[1] + .5) continue; const w = smoother(q[0], q[0] + .45, t) * (1 - smoother(q[1] - .1, q[1] + .42, t)); gy += q[2] * w; gp += q[3] * w; gr += q[4] * w; } const calm = (1 - pr) * (1 - reach) * (1 - hk) * (1 - gTilt); gy = gy * calm + .05 * Math.sin(t * .73) + .03 * Math.sin(t * 1.31 + 2); gp = gp * calm + .025 * Math.sin(t * .91 + 1) - .03 * kRun; gr *= calm;
     if (look.k > .001 || look.w > 0) { look.k = ctx.reset ? look.w : damp(look.k, look.v ? look.w : 0, 6, dt); if (look.v) { group.updateMatrixWorld(true); _v.copy(look.v); head.getWorldPosition(_v2); _v.sub(_v2); const ya = st.yaw, lx = _v.x * Math.cos(ya) - _v.z * Math.sin(ya), lz = _v.x * Math.sin(ya) + _v.z * Math.cos(ya); const ty = clamp(Math.atan2(-lz, lx), -1.15, 1.15), tq = clamp(Math.atan2(_v.y, Math.hypot(lx, lz)) + .35, -.5, .6); look.y = ctx.reset ? ty : damp(look.y, ty, 7, dt); look.p = ctx.reset ? tq : damp(look.p, tq, 7, dt); } gy = lerp(gy, look.y, look.k * calm); gp = lerp(gp, look.p, look.k * calm); }
     const thr = .045 * Math.cos(TAU * (p - .12)) * A, hx = PW[6] + thr - .10 * Math.abs(gy) * .6 + HL.x - .05 * hA, hy = PW[7] + .5 * HL.y + .022 * Math.cos(TAU * (p + .1)) * A - .08 * hA + .012 * Math.sin(t * 1.9) - .03 * gSnap, hz = -.17 * Math.sin(gy) + HL.z, hyaw = gy + .26 * pr * Math.sin(t * .9) + .35 * pr + .05 * hShake, hpit = PW[8] + gp + .02 * Math.sin(TAU * (p - .3)) * A + .05 * hShake * .6 + .10 * gSnap + pr * .05 * Math.sin(t * 21) - .12 * hA, hrol = gr + HL.r * .3 + .04 * Math.sin(t * .57) + .35 * pr * Math.sin(t * .7 + 1) * .4 + .03 * gJoy;
     Mrel.copy(Mb).invert().multiply(Ms); Mrel.decompose(_lm, qr, _v3); qi.identity(); qr.copy(qi.slerp(qr, .78));
@@ -318,16 +350,16 @@ const Pelican = (() => {
     // ---- bill, pouch, eyes
     const open = clamp(.004 * breath + .95 * hOpen * (.86 + .14 * Math.sin(t * 62)) + .92 * gOpen + pr * (.06 + .06 * Math.sin(t * 26)) + .10 * kRun * kGnd + .03 * kFly), jawA = .62 * open + .02 * Math.max(0, gSnap); state.open = open; jaw.rotation.z = -jawA; P.jawMesh.morphTargetInfluences[0] = open;
     group.updateMatrixWorld(true); sim(ctx, dt, T, kFly); posePouch(open, jawA, PSt, { s: gPs, a: gPa * 1.15 }, t);
-    const bl = Math.max(blinkAt(t), gTilt * .85, .55 * sm(0, 1, pr) * (.5 + .5 * Math.sin(t * 1.7)), .9 * pulseBump(t)), wide = clamp(hk + reach * .6 + sm(T_OFF - .5, T_OFF, t) * (1 - sm(T_OFF + 1, T_OFF + 2, t)) + .4 * sm(T_TOUCH - .8, T_TOUCH - .3, t) * (1 - sm(T_TOUCH + .6, T_TOUCH + 1.4, t))); const tired = .10 * kFl + .05; UB.uBl.value.set(lerp(lerp(.80 - tired, 1.06, wide), -.30, bl), lerp(lerp(.78, .95, wide), .30, bl)); UB.uCat.value = lerp(.9, .30, Sky.S.night || 0); uNf.value = Sky.S.night || 0;
+    const bl = Math.max(blinkAt(t), gTilt * .85, .55 * sm(0, 1, pr) * (.5 + .5 * Math.sin(t * 1.7)), (ride ? 0 : .9 * pulseBump(t))), wide = clamp(hk + reach * .6 + (ride ? 0 : sm(T_OFF - .5, T_OFF, t) * (1 - sm(T_OFF + 1, T_OFF + 2, t)) + .4 * sm(T_TOUCH - .8, T_TOUCH - .3, t) * (1 - sm(T_TOUCH + .6, T_TOUCH + 1.4, t)))); const tired = .10 * kFl + .05; UB.uBl.value.set(lerp(lerp(.80 - tired, 1.06, wide), -.30, bl), lerp(lerp(.78, .95, wide), .30, bl)); UB.uCat.value = lerp(.9, .30, Sky.S.night || 0); uNf.value = Sky.S.night || 0;
     const ex = gaze(t) * .16 - gy * .25, ey = .10 * Math.sin(t * .77 + 3) * .5 + gp * .2; for (const [e, s] of [[eyeR, 1], [eyeL, -1]]) { _e.set(-ey, (-ex) * 1, 0, 'YXZ'); e.quaternion.copy(e.userData.q0).multiply(_q.setFromEuler(_e)); }
     // ---- wings
     const fW = clamp(Math.max(T.wing, 0) + .40 * hFl * kGnd + .055 * shuf * (1 - T.wing) + .02 * Math.max(0, bump)), curl = lerp(.0, .22, 1) + clamp(vfl * .052, -.42, .60) * (1 - kFl) + .10 * gl + .10 * kBrake, flex = clamp(-vf * .10, 0, 1) * T.wing * (1 - .6 * kBrake);
-    const w = { f: fW, fl: -fl * (1 - .5 * kBrake) + .25 * hFl * (1 - T.wing) + .06 * gl * Math.sin(t * 2.2), fh: -fh * (1 - .5 * kBrake) + .3 * hFl * (1 - T.wing), flex, tw: -.10 * clamp(vf * .16, -1, 1) * (1 - kBrake) + .10 * gl, dih: lerp(7, 24, kBrake) + 9 * hFl + 3 * Math.sin(t * 1.1) * gl, curl, splay: 5 * clamp(vf * .2, -1, 1) + 8 * gl + 16 * kBrake, swp: 14 * kBrake - 3 * clamp(vf * .15, -1, 1), sh: .02 * hShake * hFl, cup: kBrake, bob: .022 * Math.exp(-dStep * 7) * Math.sin(dStep * 30) * kGnd + .02 * bump, sag: .010 * s2 * A };
+    const w = { f: fW, fl: -fl * (1 - .5 * kBrake) + .25 * hFl * (1 - T.wing) + .06 * gl * Math.sin(t * 2.2), fh: -fh * (1 - .5 * kBrake) + .3 * hFl * (1 - T.wing), flex, tw: -.10 * clamp(vf * .16, -1, 1) * (1 - kBrake) + .10 * gl, dih: lerp(7, 24, kBrake) + 9 * hFl + 3 * Math.sin(t * 1.1) * gl, curl, splay: 5 * clamp(vf * .2, -1, 1) + 8 * gl + 16 * kBrake, swp: 14 * kBrake - 3 * clamp(vf * .15, -1, 1), sh: .02 * hShake * hFl, cup: kBrake, bob: .022 * Math.exp(-dStep * 7) * Math.sin(dStep * 30) * kGnd * gaitWeight + .02 * bump, sag: .010 * s2 * A };
     const jit = hShake * hFl; poseWing(1, Object.assign({}, w, { fl: w.fl + jit * .22 + .02 * Math.sin(t * 1.7) * gl, dih: w.dih + 40 * T.roll * .12 * kFly })); poseWing(-1, Object.assign({}, w, { fl: w.fl - jit * .16 + .02 * Math.sin(t * 1.9 + 1) * gl, fh: w.fh, f: clamp(w.f - .008 * Math.abs(shuf)), dih: w.dih - 40 * T.roll * .12 * kFly }));
-    for (let i = 0; i < 6; i++) bones[B_ARM + i].matrix.multiplyMatrices(Mb, ARM[i]); imC.castShadow = fW > .10; UF.uTr.value = sm(.15, .6, fW); legM.visible = t < T_TOUCH + 1.0;
+    for (let i = 0; i < 6; i++) bones[B_ARM + i].matrix.multiplyMatrices(Mb, ARM[i]); imC.castShadow = fW > .10; UF.uTr.value = sm(.15, .6, fW); legM.visible = ride || t < T_TOUCH + 1.0;
     poseTail(t, p, A, wag, kFly, kBrake, kFl, T, hFl); poseCrest(t);
     // ---- legs
-    for (let i = 0; i < 2; i++) leg(i, t, p, T, kFly, kSki, kFl, hHop);
+    for (let i = 0; i < 2; i++) leg(i, t, p, T, ride);
     group.updateMatrixWorld(true); imL.instanceMatrix.needsUpdate = imC.instanceMatrix.needsUpdate = true; imL.geometry.attributes.aF.needsUpdate = imC.geometry.attributes.aF.needsUpdate = true;
   }
   const gaze = t => { const k = Math.floor(t / .83), a = h1(k * 5.3) - .5, b = h1((k - 1) * 5.3) - .5; return lerp(b, a, sm(0, .07, t - k * .83)); };
@@ -352,9 +384,25 @@ const Pelican = (() => {
 
   // ---- legs ---------------------------------------------------------------------------------------------------------------------------------------------------
   const FA2 = { p: V3(), phi: 0, spr: 1, curl: 0, out: 0, down: false, c: 0 }, H = V3(), K = V3(), FJ = V3(), dL = V3(), pole = V3(), Xb = V3(), Yb = V3(), Zb = V3();
-  function leg(i, t, p, T, kFly, kSki, kFl, hop) {
-    const sd = i ? 1 : -1, o = FA2; const gp = t > T_OFF ? T_RUN / BEAT + (t - T_RUN) / (BEAT / 2) : p; gait(i, gp, T, o); const rel = i === 0 ? sm(T_OFF + .10, T_OFF + .75, t) : sm(T_OFF - .02, T_OFF + .55, t); const tuck = Math.max(rel, 0);
-    if (tuck > 0) { // trail under the tail, then skis, then paddles
+  function leg(i, t, p, T, ride) {
+    const sd = i ? 1 : -1, o = FA2;
+    let tuck = 0;
+    if (ride) {
+      rideGait(i, T, o);
+      const trailing = T.legs, paddling = T.float, paddle = T.t * (2.4 + T.speed * .7) + i * PI;
+      o.p.lerp(_v.set(-1.02, .80 + .05 * T.flapLag, sd * .17), trailing);
+      o.p.lerp(_v.set(.02 + .25 * Math.sin(paddle), -.48 + .075 * Math.cos(paddle), sd * .23), paddling);
+      o.phi = lerp(lerp(o.phi, 2.55, trailing), .7 + .55 * Math.cos(paddle), paddling);
+      o.spr = lerp(lerp(o.spr, .34, trailing), .75 + .27 * Math.cos(paddle), paddling);
+      o.curl = lerp(lerp(o.curl, .25, trailing), .1, paddling);
+      tuck = Math.max(trailing, paddling);
+      o.down = o.down && T.mode !== 'fly' && T.mode !== 'float';
+    } else {
+      const gp = t > T_OFF ? T_RUN / BEAT + (t - T_RUN) / (BEAT / 2) : p;
+      gait(i, gp, T, o);
+      tuck = i === 0 ? sm(T_OFF + .10, T_OFF + .75, t) : sm(T_OFF - .02, T_OFF + .55, t);
+    }
+    if (!ride && tuck > 0) { // trail under the tail, then skis, then paddles
       const fy = T.pos.y, wl = Path.WATER - fy; const trail = .045 * flapAt(t - .12); const tx = -1.02, ty = .80 + trail, tz = sd * .17, kS = sm(T_TOUCH - 1.35, T_TOUCH - .4, t), kP = sm(T_TOUCH + .30, T_TOUCH + .95, t), kH = sm(T_TOUCH + .38, T_TOUCH + .98, t), pad = t * 2.1 + (i ? PI : 0); const sx = .60 + .05 * sd, sy = Math.max(wl + .09, -.55) + .02 * Math.sin(t * 9 + i * 2) * sm(T_TOUCH, T_TOUCH + .1, t), sz = sd * .27, px = .02 + .24 * Math.sin(pad), py = -.50 + .06 * Math.cos(pad), pz = sd * .23;
       let X = lerp(lerp(tx, sx, kS), px, kP), Y = lerp(lerp(ty, sy, kS), py, kP), Z = lerp(lerp(tz, sz, kS), pz, kP); _v.set(.0, .98, sd * .12).applyMatrix4(Mb); X = lerp(X, _v.x, kH); Y = lerp(Y, _v.y, kH); Z = lerp(Z, _v.z, kH); o.p.set(lerp(o.p.x, X, tuck), lerp(Math.max(o.p.y, -.2), Y, tuck), lerp(o.p.z, Z, tuck)); o.phi = lerp(o.phi, lerp(lerp(2.55, -.50 - .06 * Math.sin(t * 13 + i), kS), .7 + .55 * Math.cos(pad), kP), tuck); o.spr = lerp(o.spr, lerp(lerp(.34, 1.12, kS), .75 + .35 * Math.cos(pad), kP), tuck); o.curl = lerp(o.curl, lerp(lerp(.25, -.12, kS), .1, kP), tuck); o.down = o.down && tuck < .02; }
     // joint from the ball of the foot: heel lifts about the ball
@@ -374,13 +422,14 @@ const Pelican = (() => {
   P.foot = (i, o) => out3(o).copy(foots[i].l).applyMatrix4(group.matrixWorld); P.footDown = i => foots[i].down;
   P.lookAt = (v, w = 1) => { look.v = v ? (look.vv = look.vv || V3()).copy(v) : null; look.w = v ? w : 0; };
   const pushEv = (L, e) => { L.push(e); if (L.length > 24) L.shift(); };
-  P.honk = t => pushEv(EV.honk, (t === undefined ? G.t : t) + .1); P.gulp = t => pushEv(EV.gulp, t); P.openBill = (a, b) => pushEv(EV.open, [a, b]);
+  P.honk = (t, ride = false) => pushEv(ride ? rideHonks : EV.honk, (t === undefined ? G.t : t) + .1); P.gulp = t => pushEv(EV.gulp, t); P.openBill = (a, b) => pushEv(EV.open, [a, b]);
+  P.resetRideActions = () => { rideHonks.length = 0; };
   P.bodyMatrix = Mb; P.bodyWorld = o => (o || new THREE.Matrix4()).copy(body.matrixWorld); P.seatPos = o => seat.getWorldPosition(out3(o));
   P.info = () => ({ long: P.nLong * 2 + tail.length + crest.length, cov: P.nCov * 2, body: P.bodyFeathers, head: P.headFeathers });
   const reg = { order: 20, build() {
     const tm = buildTorso(); buildPlumage(); buildWings(); skinM = buildSkin(); const hm = buildHead(), bm = buildBill(); legM = buildLegs(); reg.pick = [tm, hm, ...bm];
     const ctx0 = { t: 0, dt: 1 / 60, st: Path.bird(0), reset: true }; update(ctx0); sp3.init = false; group.traverse(o => o.layers.enable(1)); return group; },
-    update, poke(hit, ctx) { P.honk(ctx.t); } };
+    update, poke(hit, ctx) { P.honk(ctx.freeRide ? ctx.st.t : ctx.t, ctx.freeRide); } };
   Assets.add('pelican', reg);
   return P;
 })();

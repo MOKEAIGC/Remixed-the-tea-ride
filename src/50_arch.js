@@ -371,10 +371,29 @@ const Arch = (() => {
   function build() {
     materials(); T.roofL = null; templates(); T.roofL = tpl(Geo.lathe([[.175, 0], [.165, .015], [.07, .13], [.06, .16], [.075, .17], [.03, .21], [.012, .27], [0, .275]], 4)); ropeMat = Mat.make('cloth', { color: '#d9c08c', rough: .95 });
     pavement(); quay(); northRow(); southRow(); backTown(); westTerrace(); flush(); buildShutters(); buildBoats(); return group; }
-  const bp = { pos: V3(), vel: V3() };
+  const bp = { pos: V3(), vel: V3() }, footMarks = [], footPoint = V3();
+  let previousStep = 0;
+  function rideFootMarks(ctx) {
+    const st = ctx.st, step = Math.floor(st.phase);
+    if (ctx.reset) { footMarks.length = 0; previousStep = step; }
+    if (step > previousStep && st.speed > .35 && (st.mode === 'walk' || st.mode === 'run') && st.pos.x >= -74) {
+      Pelican.foot(step % 2, footPoint);
+      footMarks.unshift({ x: footPoint.x, z: footPoint.z, t: st.t, strength: .55 + .5 * st.run });
+      if (footMarks.length > U.uFt.value.length) footMarks.pop();
+    }
+    previousStep = step;
+    for (const [i, field] of U.uFt.value.entries()) {
+      const mark = footMarks[i];
+      if (mark && st.t - mark.t < 1.2) field.set(mark.x, mark.z, st.t - mark.t, mark.strength);
+      else field.w = 0;
+    }
+  }
   function update(ctx) { const t = ctx.t; // footfalls -> rings in the stones
-    const S = Score.recent('step', t, 1.2); for (let i = 0; i < 6; i++) { const f = U.uFt.value[i], e = S[i]; if (!e) { f.w = 0; continue; } const p = Path.bird(e.t, bp); f.set(p.pos.x, p.pos.z + (e.foot ? .28 : -.28), t - e.t, p.pos.y < .3 ? Math.min(1.15, e.v) : 0); }
-    const K = Score.recent('taiko', t, 1.3); for (let i = 0; i < 3; i++) { const f = U.uTk.value[i], e = K[i]; if (!e) { f.w = 0; continue; } const p = Path.bird(e.t, bp); f.set(p.pos.x, p.pos.z, t - e.t, p.pos.y < .3 ? e.v : 0); }
+    if (ctx.freeRide) rideFootMarks(ctx);
+    else { const S = Score.recent('step', t, 1.2); for (let i = 0; i < 6; i++) { const f = U.uFt.value[i], e = S[i]; if (!e) { f.w = 0; continue; } const p = Path.bird(e.t, bp); f.set(p.pos.x, p.pos.z + (e.foot ? .28 : -.28), t - e.t, p.pos.y < .3 ? Math.min(1.15, e.v) : 0); } }
+    const drums = Score.recent('taiko', t, 1.3);
+    const K = ctx.freeRide ? drums.filter(e => e.live) : drums;
+    for (let i = 0; i < 3; i++) { const f = U.uTk.value[i], e = K[i]; if (!e) { f.w = 0; continue; } const p = ctx.freeRide ? ctx.st : Path.bird(e.t, bp); f.set(p.pos.x, p.pos.z, t - e.t, p.pos.y < .3 && (!ctx.freeRide || p.mode === 'walk' || p.mode === 'run') ? e.v : 0); }
     const C = Score.sec(t) === 'C', nt = Sky.S.t; U.uWinT.value = nt; U.uNg.value = Sky.S.night * (1 - LU.uPrint.value); U.uWinP.value = C ? .84 + .30 * Score.env('bass', t, .45) + .10 * Score.env('wood', t, .18) : 1; U.uSg.value.set(LU.uWind.value.z, Score.env('wood', t, .5) * .5 + Score.env('taiko', t, .5) * .4);
     for (let i = 0; i < 4; i++) { const k = U.uPk.value[i]; if (k.x >= 0) { const u = t - k.z; k.y = u < 0 || u > 9 ? 0 : sm(0, .12, u) * (1 - sm(7, 9, u)) * 1.1; if (u > 9 || u < -1) k.x = -1; } }
     updateShutters(t); for (const b of boats) { const h = .035 * Math.sin(t * 1.25 + b.ph) + .02 * Math.sin(t * 2.1 + b.ph * 2.3), rl = .035 * Math.sin(t * 1.05 + b.ph * 1.7) + .015 * Math.sin(t * 2.4 + b.ph); b.m.position.set(b.x + .05 * Math.sin(t * .5 + b.ph), WY + .06 + h, b.z + .04 * Math.sin(t * .41 + b.ph * 2)); b.m.rotation.set(rl, b.ry + .02 * Math.sin(t * .37 + b.ph), .02 * Math.sin(t * 1.4 + b.ph), 'YXZ'); b.m.updateMatrix(); for (const r of b.ropes) { pA.set(r.lx, .60, 0).applyMatrix4(b.m.matrix); pB.set(r.rx, .34, 9.27); ropeTo(r, pA, pB); } } }

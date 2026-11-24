@@ -80,6 +80,47 @@ const Air = (() => {
 
   // ==================================================== SKY LANTERNS ====================================================================================
   const NL = 516, NEAR = 60, L = []; let lnN, lnF, glw, gP, gC; const LC = ['#fff0d2', '#ffe9c0', '#ffdcae', '#ffd3b0', '#ffe3a0', '#f9c4a4', '#fff4e0'];
+  const rideLanterns = [], MAX_RIDE_LANTERNS = 48, lanternRandom = rng(1917);
+  let rideLanternTime = 0;
+
+  function releaseLanterns(ctx, count = 1) {
+    if (!lnN || !ctx?.freeRide || !ctx.st || !Number.isFinite(count)) return 0;
+    const released = clamp(Math.floor(count), 0, Math.min(16, MAX_RIDE_LANTERNS - rideLanterns.length));
+    const { pos, vel, yaw, mode } = ctx.st;
+    const fx = Math.cos(yaw), fz = -Math.sin(yaw), rx = Math.sin(yaw), rz = Math.cos(yaw);
+    const air = mode === 'fly';
+    for (let i = 0; i < released; i++) {
+      const row = i % 3;
+      const ahead = (air ? 4.2 : 2.6) + (released > 1 ? row * 1.8 : 0);
+      const side = released === 1 ? 1.05 : (i - (released - 1) / 2) * .74;
+      const x = pos.x + fx * ahead + rx * side;
+      const y = pos.y + 2.0 + .18 * row;
+      const z = pos.z + fz * ahead + rz * side;
+      const wind = Wind.at(x, y, z, v3);
+      rideLanterns.push({
+        x, y, z, t0: rideLanternTime + i * .095, life: 26 + lanternRandom() * 6,
+        v: 1.24 + .36 * lanternRandom(), ta: 1, s: .86 + .24 * lanternRandom(),
+        dx: wind.x * .42 + rx * side * .09, dz: wind.z * .42 + rz * side * .09,
+        vx: vel.x * (air ? .86 : .36), vz: vel.z * (air ? .86 : .36),
+        ph: lanternRandom() * TAU, sd: lanternRandom(), col: hex(LC[i % LC.length]), p: V3(),
+        g: 0, on: false,
+      });
+    }
+    return released;
+  }
+
+  function clearRideLanterns() {
+    rideLanterns.length = 0;
+    rideLanternTime = 0;
+  }
+
+  function advanceRideLanterns(dt) {
+    rideLanternTime += dt;
+    for (let i = rideLanterns.length - 1; i >= 0; i--) {
+      const q = rideLanterns[i];
+      if (rideLanternTime - q.t0 >= q.life) rideLanterns.splice(i, 1);
+    }
+  }
   // the lens, tabulated from the shot list (falls back to the two last set-ups when the film is not loaded)
   const lensTable = () => { const o = [], fm = typeof Film !== 'undefined' && Film.SHOTS && Film.V ? Film : null; for (let t = 53; t < 81.6; t += .12) { const b = Path.posAt(t); let c; if (fm) { let sh = fm.SHOTS[fm.SHOTS.length - 1]; for (const k of fm.SHOTS) if (t < k[1]) { sh = k; break; } sh[2](t); c = fm.V.p.clone(); } else if (t < 69.6) continue; else if (t < 74.4) { const u = smoother(71.9, 74.6, t); c = V3(lerp(-99.2, -106.5, u), lerp(-.28, .55, u), lerp(-21.2, -18.6, u)); } else c = V3(b[0] - .5, .9, b[2] + 9.6); o.push({ t, c, b: V3(b[0], b[1] + 1.5, b[2]) }); } return o; };
   let LT = null; const seg = V3(), rel_ = V3(); function lensClear(q) { const p = lp; for (const e of LT) { if (e.t < q.t0 - 5) continue; lanternPos(q, e.t, p); rel_.subVectors(p, e.c); const d2 = rel_.lengthSq(), near = e.t > 73.6 ? 4.4 : 2.7; if (d2 < near * near) return false; seg.subVectors(e.b, e.c); const L2 = seg.lengthSq(), u = clamp(rel_.dot(seg) / L2); rel_.addScaledVector(seg, -u); const tube = e.t > 69.5 && e.t < 73.7 ? 2.9 : e.t >= 73.7 ? 1.9 : 1.25; if (rel_.lengthSq() < tube * tube) return false; } return true; }
@@ -106,14 +147,50 @@ const Air = (() => {
       fragmentShader: /* glsl */`varying vec2 vQ; varying vec4 vC; uniform float uTime, uPrint; uniform sampler2D tNz; void main(){ float r = length(vQ), a; vec3 c = vC.rgb; if (vC.a > 0.5) { float y = vQ.y * 0.5 + 0.5; float sd = vC.a - 1.0; float n = texture2D(tNz, vec2(vQ.x * 0.1 + sd * 7.0, y * 0.18 - uTime * 0.7 + sd * 3.0)).r - 0.5; float x = vQ.x + n * y * 1.6; float w = 0.62 * sqrt(max(y, 0.0)) * (1.0 - y) * 2.2 + 0.02; a = (1.0 - smoothstep(w * 0.25, w, abs(x))) * smoothstep(0.0, 0.1, y); c = mix(c, c * vec3(0.4, 0.6, 1.6), smoothstep(0.22, 0.0, y)); } else { a = max(1.0 - r, 0.0); a = a * a * a * 0.8 + a * 0.06; } gl_FragColor = vec4(c * a * (1.0 - uPrint), 1.0); }` })); glw.frustumCulled = false; glw.renderOrder = 8; l1(glw); g.push(glw); }
   // how bright each lantern is right now: base flicker, then the koto runs through the cloud in bands of height, bells flare a few
   let kEv = [], bEv = []; const kotoK = (q, t, bx, by, bz) => { let s = 0; if (kEv.length) { const d = Math.sqrt((q.p.x - bx) ** 2 + (q.p.y - by) ** 2 + (q.p.z - bz) ** 2), h = fract((q.p.y + 40) / 12 + q.sd * .06) * 8; for (const e of kEv) { const u = t - e.t - d / 95; if (u < 0 || u > 1.4) continue; let dr = Math.abs(h - (e.r + .5)); if (dr > 4) dr = 8 - dr; s += e.v * Math.exp(-dr * dr * .85) * sm(0, .035, u) * Math.exp(-u / .26); } } for (const e of bEv) { if (h1(q.sd * 97 + e.i * 3.7) < .07) { const u = t - e.t - q.sd * .35; if (u > 0) s += 2.4 * e.v * sm(0, .06, u) * Math.exp(-u / .9); } } return s; };
-  function updLanterns(t, st) { kEv = t > 52 ? Score.recent('koto', t, 1.9).filter(e => e.r !== undefined) : []; bEv = t > 52 ? Score.recent('bell', t, 4.5) : []; const b = st.pos, amp = lerp(1.0, .62, sm(72, 76, t)); wA.set(0, 0, 0); wB.set(0, 0, 0); let sA = 0, sB = 0, gA = 0, gB = 0; const rx = Math.sin(st.yaw), rz = Math.cos(st.yaw); for (const q of L) { const u = t - q.t0; q.on = u > (q.hold ? -3.4 : q.late ? -5 : -1.2); if (!q.on) { q.g = 0; continue; } lanternPos(q, t, q.p); q.open = q.hold ? sm(-3.4, -2.3, u) : q.late ? sm(-5, -3.8, u) : sm(-1.2, -.3, u); const lit = q.hold ? sm(-2.4, -.6, u) : q.late ? sm(-4.7, -2.4, u) * .85 + .15 * sm(0, 1, u) : sm(-.6, .8, u); q.mu = kotoK(q, t, b.x, b.y, b.z) * amp; q.g = lit * (.84 + q.mu * 2.3) * (.92 + .08 * Math.sin(t * 2.3 + q.ph)); const dx = q.p.x - b.x, dy = q.p.y - b.y - 1.4, dz = q.p.z - b.z, d2 = dx * dx + dy * dy + dz * dz; if (d2 < 900) { const w = q.g / ((1 + d2 * .12) * (1 + d2 * .12)); if (dx * rx + dz * rz > 0) { sA += w; gA += q.g / (2.5 + d2); wA.x += q.p.x * w; wA.y += q.p.y * w; wA.z += q.p.z * w; } else { sB += w; gB += q.g / (2.5 + d2); wB.x += q.p.x * w; wB.y += q.p.y * w; wB.z += q.p.z * w; } } }
+  function updLanterns(ctx) {
+    const { t, st, freeRide } = ctx;
+    if (freeRide) advanceRideLanterns(ctx.dt);
+    const visibleLanterns = freeRide ? rideLanterns : L;
+    const motionTime = freeRide ? rideLanternTime : t;
+    kEv = freeRide || t > 52 ? Score.recent('koto', t, 1.9).filter(e => e.r !== undefined) : [];
+    bEv = freeRide || t > 52 ? Score.recent('bell', t, 4.5) : [];
+    const b = st.pos, amp = freeRide ? .65 : lerp(1.0, .62, sm(72, 76, t));
+    wA.set(0, 0, 0); wB.set(0, 0, 0);
+    let sA = 0, sB = 0, gA = 0, gB = 0;
+    const rx = Math.sin(st.yaw), rz = Math.cos(st.yaw);
+    for (const q of visibleLanterns) {
+      const u = motionTime - q.t0;
+      q.on = u > (freeRide ? 0 : q.hold ? -3.4 : q.late ? -5 : -1.2);
+      if (!q.on) { q.g = 0; continue; }
+      let lit;
+      if (freeRide) {
+        pos0(q, motionTime, q.p);
+        const carried = 2.4 * (1 - Math.exp(-u / 2.4));
+        q.p.x += q.vx * carried;
+        q.p.z += q.vz * carried;
+        q.open = sm(0, .85, u);
+        lit = 1.75 * sm(.08, .6, u) * (1 - sm(q.life - 2, q.life, u));
+      } else {
+        lanternPos(q, t, q.p);
+        q.open = q.hold ? sm(-3.4, -2.3, u) : q.late ? sm(-5, -3.8, u) : sm(-1.2, -.3, u);
+        lit = q.hold ? sm(-2.4, -.6, u) : q.late ? sm(-4.7, -2.4, u) * .85 + .15 * sm(0, 1, u) : sm(-.6, .8, u);
+      }
+      q.mu = kotoK(q, t, b.x, b.y, b.z) * amp;
+      q.g = lit * (.84 + q.mu * 2.3) * (.92 + .08 * Math.sin(motionTime * 2.3 + q.ph));
+      const dx = q.p.x - b.x, dy = q.p.y - b.y - 1.4, dz = q.p.z - b.z, d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 >= 900) continue;
+      const w = q.g / ((1 + d2 * .12) * (1 + d2 * .12));
+      if (dx * rx + dz * rz > 0) { sA += w; gA += q.g / (2.5 + d2); wA.x += q.p.x * w; wA.y += q.p.y * w; wA.z += q.p.z * w; }
+      else { sB += w; gB += q.g / (2.5 + d2); wB.x += q.p.x * w; wB.y += q.p.y * w; wB.z += q.p.z * w; }
+    }
     // two pooled lights on the bird: weighted middle of what hangs on each side
-    const set = (l, w, s, g) => { if (s > 1e-5) { v3.set(w.x / s - b.x, w.y / s - b.y - 1.4, w.z / s - b.z); const d = v3.length() || 1, k = Math.min(d, 4.6) / d; l.position.set(b.x + v3.x * k, Math.max(WL + .6, b.y + 1.4 + v3.y * k), b.z + v3.z * k); } l.intensity = 11.5 * (1 - Math.exp(-g * 5)) * sm(53, 56.5, t) * (1 - LU.uPrint.value); }; set(plA, wA, sA, gA); set(plB, wB, sB, gB);
-    for (const h of lanH) { const q = L[h.k]; h.g = q.on ? q.g * .9 * (1 - sm(5, 11, q.p.y)) : 0; if (h.g > .004) Lan.pos(h.id, q.p.x, q.p.y + .1, q.p.z); } }
+    const set = (l, w, s, g) => { if (s > 1e-5) { v3.set(w.x / s - b.x, w.y / s - b.y - 1.4, w.z / s - b.z); const d = v3.length() || 1, k = Math.min(d, 4.6) / d; l.position.set(b.x + v3.x * k, Math.max(WL + .6, b.y + 1.4 + v3.y * k), b.z + v3.z * k); } l.intensity = 11.5 * (1 - Math.exp(-g * 5)) * (freeRide ? 1 : sm(53, 56.5, t)) * (1 - LU.uPrint.value); }; set(plA, wA, sA, gA); set(plB, wB, sB, gB);
+    for (const h of lanH) { const q = L[h.k]; h.g = !freeRide && q.on ? q.g * .9 * (1 - sm(5, 11, q.p.y)) : 0; if (h.g > .004) Lan.pos(h.id, q.p.x, q.p.y + .1, q.p.z); }
+  }
   const wA = V3(), wB = V3(), plA = new THREE.PointLight(new THREE.Color(1, .62, .30), 0, 26, 2), plB = new THREE.PointLight(new THREE.Color(1, .62, .30), 0, 26, 2), lanH = [];
-  const ord = []; function drawLanterns(cam, t) { const cx = cam.position.x, cy = cam.position.y, cz = cam.position.z; ord.length = 0; for (const q of L) if (q.on) { q.d = Math.sqrt((q.p.x - cx) ** 2 + (q.p.y - cy) ** 2 + (q.p.z - cz) ** 2); if (q.d < 24) ord.push(q); } if (ord.length > NEAR) { ord.sort((a, b) => a.d - b.d); ord.length = NEAR; } for (const q of ord) q.near = t; let n = 0, f = 0, k = 0; const put = (m, i, q) => { const u = Math.max(t - q.t0, 0), w = sm(0, 5, u), rx = .13 * w * Math.sin(u * .9 + q.ph), rz = .13 * w * Math.sin(u * .77 + q.ph * 2) + (q.hold ? 0 : 0); ee.set(rx, q.ph + u * .12 * (q.sd - .5), rz); qq.setFromEuler(ee); m4.compose(q.p, qq, vs.set(q.s, q.s, q.s)); m4.toArray(m.instanceMatrix.array, i * 16); m.userData.iL.setXYZW(i, q.g, q.sd, q.mu || 0, q.open); const c = m.instanceColor.array; c[i * 3] = q.col.r; c[i * 3 + 1] = q.col.g; c[i * 3 + 2] = q.col.b; };
-    for (const q of L) { if (!q.on) continue; if (q.near === t) { put(lnN, n++, q); gP.setXYZW(k, q.p.x, q.p.y + .13 * q.s, q.p.z, .135 * q.s * Math.min(1, q.g)); gC.setXYZW(k++, 4.6 * Math.min(1.6, q.g), 2.7 * Math.min(1.6, q.g), .95, 1 + q.sd * .9); } else put(lnF, f++, q); if (q.g > .01) { gP.setXYZW(k, q.p.x, q.p.y + .42 * q.s, q.p.z, 1.5 * q.s); const hg = q.g + 1.6 * q.mu; gC.setXYZW(k++, .150 * hg, .068 * hg, .020 * hg, 0); } }
-    lnN.count = n; lnF.count = f; for (const m of [lnN, lnF]) { m.instanceMatrix.needsUpdate = m.instanceColor.needsUpdate = m.userData.iL.needsUpdate = true; m.visible = m.count > 0; } k = fireflies(t, k); glw.geometry.instanceCount = k; glw.visible = k > 0; gP.needsUpdate = gC.needsUpdate = true; }
+  const ord = []; function drawLanterns(cam, ctx) { const { x: cx, y: cy, z: cz } = cam.position, items = ctx.freeRide ? rideLanterns : L, t = ctx.freeRide ? rideLanternTime : ctx.t; ord.length = 0; for (const q of items) if (q.on) { q.near = false; q.d = Math.hypot(q.p.x - cx, q.p.y - cy, q.p.z - cz); if (q.d < 24) ord.push(q); } if (ord.length > NEAR) { ord.sort((a, b) => a.d - b.d); ord.length = NEAR; } for (const q of ord) q.near = true; let n = 0, f = 0, k = 0; const put = (m, i, q) => { const u = Math.max(t - q.t0, 0), w = sm(0, 5, u), rx = .13 * w * Math.sin(u * .9 + q.ph), rz = .13 * w * Math.sin(u * .77 + q.ph * 2); ee.set(rx, q.ph + u * .12 * (q.sd - .5), rz); qq.setFromEuler(ee); m4.compose(q.p, qq, vs.set(q.s, q.s, q.s)); m4.toArray(m.instanceMatrix.array, i * 16); m.userData.iL.setXYZW(i, q.g, q.sd, q.mu || 0, q.open); const c = m.instanceColor.array; c[i * 3] = q.col.r; c[i * 3 + 1] = q.col.g; c[i * 3 + 2] = q.col.b; };
+    for (const q of items) { if (!q.on) continue; if (q.near) { put(lnN, n++, q); gP.setXYZW(k, q.p.x, q.p.y + .13 * q.s, q.p.z, .135 * q.s * Math.min(1, q.g)); gC.setXYZW(k++, 4.6 * Math.min(1.6, q.g), 2.7 * Math.min(1.6, q.g), .95, 1 + q.sd * .9); } else put(lnF, f++, q); if (q.g > .01) { gP.setXYZW(k, q.p.x, q.p.y + .42 * q.s, q.p.z, 1.5 * q.s); const hg = q.g + 1.6 * q.mu; gC.setXYZW(k++, .150 * hg, .068 * hg, .020 * hg, 0); } }
+    lnN.count = n; lnF.count = f; for (const m of [lnN, lnF]) { m.instanceMatrix.needsUpdate = m.instanceColor.needsUpdate = m.userData.iL.needsUpdate = true; m.visible = m.count > 0; } if (!ctx.freeRide) k = fireflies(ctx.t, k); glw.geometry.instanceCount = k; glw.visible = k > 0; gP.needsUpdate = gC.needsUpdate = true; }
   // ==================================================== FIREFLIES ======================================================================================
   const FF = (() => { const r = rng(515), o = []; for (let i = 0; i < 110; i++) { const s = i < 48; const a = r() * TAU, d = 3.5 + 13 * Math.sqrt(r()); o.push(s ? { x: -113 + Math.cos(a) * d, z: -27 + Math.sin(a) * d, y: WL + .25 + 1.6 * r() * r() } : { x: -75.5 - 6 * r(), z: -44 + 40 * r(), y: WL + .4 + 1.8 * r() }); Object.assign(o[i], { p: r() * TAU, q: r() * TAU, w: .5 + .8 * r(), h: r() }); } return o; })();
   function fireflies(t, k) { const on = sm(71.5, 75.5, t); if (on < .01) return k; const fl = Score.sing(t).a; for (const f of FF) { const pl = Math.pow(Math.max(0, Math.sin(t * f.w * 1.7 + f.p)), 3) * (.55 + .7 * fl) * on; if (pl < .02) continue; gP.setXYZW(k, f.x + .9 * Math.sin(t * .6 * f.w + f.q) + .3 * Math.sin(t * 1.7 + f.p), f.y + .3 * Math.sin(t * .9 * f.w + f.p), f.z + .9 * Math.cos(t * .5 * f.w + f.p), .085); gC.setXYZW(k++, 2.2 * pl, 3.0 * pl, .55 * pl, 0); } return k; }
@@ -170,9 +247,10 @@ const Air = (() => {
 
   // ==================================================== module =================================================================================================
   function build(ctx) { const g = []; buildBalloons(g); buildLanterns(g); buildClouds(g); buildFlock(g); for (let i = 0; i < 38; i++) { const h = { k: i, g: 0 }; h.id = Lan.add({ x: L[i].x, y: L[i].y, z: L[i].z, r: 4.6, color: [1, .58, .24], gain: () => h.g }); if (h.id >= 0) lanH.push(h); } for (const l of [plA, plB]) { l.layers.enable(1); g.push(l); } A.pick = pickB; return g; }
-  function update(ctx) { const t = now = ctx.t; if (ctx.reset) liveB.length = 0; updBalloons(t); updLanterns(t, ctx.st); updFlock(t); }
-  function prepass(R, scene, cam, ctx) { drawRigs(cam); drawLanterns(cam, ctx.t); drawClouds(cam, ctx.t, ctx); }
+  function update(ctx) { const t = now = ctx.t; if (ctx.reset) liveB.length = 0; updBalloons(t); updLanterns(ctx); updFlock(t); }
+  function prepass(R, scene, cam, ctx) { drawRigs(cam); drawLanterns(cam, ctx); drawClouds(cam, ctx.t, ctx); }
   const A = Assets.add('air', { order: 66, build, update, prepass, pick: [], poke(hit, ctx) { const i = hit.object.userData.i; if (i === undefined) return false; liveB.push({ i, t: ctx.t }); if (liveB.length > 24) liveB.shift(); Score.live('chord', { t: ctx.t, d: BAR, m: Score.chordAt(ctx.t).root, v: .6, notes: Score.chordAt(ctx.t).notes }); return true; } });
   const balloons = BD.map((b, i) => ({ R: b.R, pos: (o, t = now) => balloonPos(i, t, o || V3()), burn: (t = now) => burn(i, t) }));
-  return { balloons, lanterns: L, cranePos: (i, t, o) => cranePos(FL[i], t, o || V3()), lanternPos };
+  return { balloons, lanterns: L, cranePos: (i, t, o) => cranePos(FL[i], t, o || V3()), lanternPos,
+    releaseLanterns, clearRideLanterns, get rideLanternCount() { return rideLanterns.length; } };
 })();

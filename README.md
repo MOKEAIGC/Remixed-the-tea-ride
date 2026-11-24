@@ -14,7 +14,39 @@ It opens as a flat woodblock sheet: the colour blocks go down on four clacks, th
 
 ## Watch it
 
-Download `index.html` and open it in a desktop browser with WebGL 2. Press once to begin with sound.
+Open `index.html` in a browser with WebGL 2. Pick **自由骑行** to explore the market and the pier, or **播放短片** to watch the original film.
+
+### Free ride
+
+| Input | Action |
+|---|---|
+| `W` / `↑`, `S` / `↓` | Move forward and back. In flight, speed up and brake |
+| `A` / `←`, `D` / `→` | Steer left and right |
+| `Shift` | Sprint or give the bird a boost in flight |
+| `Space`, `Z` / `X`, `C` | Take off, climb or descend, and land on the ground or lake |
+| Drag, scroll | Orbit and zoom the camera |
+| `Q`, `E` | Honk and sip tea |
+| `F`, `Shift+F` | Toss a lemon or make it rain lemons |
+| `L`, `Shift+L` | Release one sky lantern or a group |
+| `P`, `T`, `V`, `O` | Woodblock mode, time of day, camera angle and full screen |
+| `B`, `Y`, `Shift+1–5`, `N`, `M`, `I` | Drum, koto riff, individual strings, score, mute and pause |
+| `H`, `Esc`, `R` | Open the control panel, close or leave the current sequence, and reset to the starting point |
+
+The control panel has mouse and touch buttons for actions. Inputs can be combined, for example `W` + `Shift` + `Z` for a powered climb or `T` and `Shift+L` for a moonlit lantern release. Clicking on objects still plays them.
+
+| Shortcut | Sequence |
+|---|---|
+| `U` | Arrive at the tea stalls, play koto, take a sip and honk |
+| `G` | Go to the pier, set the sun, honk, run and take off |
+| `J` | Take off at night and release three waves of sky lanterns |
+| `K` | Land, have a sip and release a lantern |
+| `1`–`8` | Play the original opening, market, tea break, lemon chase, pier takeoff, lantern flight, lake landing or printed ending |
+
+The original film sequences return you to your playing position when they end. You can return early with `Esc` or the banner button. Steering or pressing `Esc` cancels a live action combination.
+
+Ride through the three gold markers to check in at the market entrance, the tea stalls and the pier. Touch controls are available on touch screens. Add `?ride` to the local URL to open the game directly.
+
+### Film controls
 
 | Input | Action |
 |---|---|

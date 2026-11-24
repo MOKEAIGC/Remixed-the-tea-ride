@@ -126,7 +126,7 @@ function synth(P) {
 }
 
 const Sound = (() => {
-  const S = { ready: false, ctx: null, on: false, muted: false }, SR = 44100, TAIL = 3; let data = null, mBuf, fBuf, bank = {}, gM, gF, gL, comp, startAt = 0, srcs = [], waiters = [];
+  const S = { ready: false, ctx: null, on: false, muted: false }, SR = 44100, TAIL = 3; let data = null, mBuf, fBuf, bank = {}, gM, gF, gL, comp, startAt = 0, srcs = [], waiters = [], musicOnly = false;
   function params() { const ev = typeof Beasts !== 'undefined' && Beasts.events ? (() => { try { return Beasts.events(0, Score.DUR).map(e => { const b = Path.bird(clamp(e.t, 0, Score.DUR)), p = e.pos, dx = p ? (p.isVector3 ? p.x : p[0]) - b.pos.x : 0, dz = p ? (p.isVector3 ? p.z : p[2]) - b.pos.z : 0, dy = b.pos.y, d = Math.hypot(dx, dz, dy); return { t: e.t, k: e.k, g: 1 / (1 + (d / 11) * (d / 11)), pan: e.t < 52 ? clamp(.5 + dx / 22, .12, .88) : .5 }; }); } catch (e) { return []; } })() : [{ t: 7.2, k: 'bleat' }, { t: 15.0, k: 'thump' }, { t: 19.0, k: 'bleat' }, { t: 10.6, k: 'giraffe' }, { t: 31.4, k: 'bleat' }, { t: 48.6, k: 'trumpet' }, { t: 50.5, k: 'yip' }, { t: 52.9, k: 'trumpet' }]; return { SR, DUR: Score.DUR, TAIL, tr: JSON.parse(JSON.stringify(Score.tracks)), CUE: Score.CUE, ev }; }
   // synthesise off the main thread when the host allows workers, on it when not
   S.prepare = () => new Promise(res => { const P = params(), done = d => { data = d; S.ready = true; waiters.forEach(f => f()); res(d); }; let w = null; const main = () => setTimeout(() => done(synth(P)), 30);
@@ -136,8 +136,8 @@ const Sound = (() => {
   function load() { if (mBuf || !data || !S.ctx) return; mBuf = mk(data.music[0], data.music[1]); fBuf = mk(data.fx[0], data.fx[1]); for (const k in data.bank) bank[k] = mk(data.bank[k]); data.music = data.fx = null; }
   S.open = () => { if (S.ctx) return S.ctx; const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; S.ctx = new AC({ latencyHint: 'interactive' }); graph(); return S.ctx; };
   // play from film time t; loops are chained so the tail of one ride rings into the next
-  S.play = t => { if (!S.ctx || !S.ready) return false; load(); S.stop(); const now = S.ctx.currentTime + .06; startAt = now - t; sched(now, t); S.on = true; return true; };
-  function sched(when, off) { for (const [b, g] of [[mBuf, gM], [fBuf, gF]]) { const s = S.ctx.createBufferSource(); s.buffer = b; s.connect(g); s.start(when, off); s.onended = () => { const i = srcs.indexOf(s); if (i >= 0) srcs.splice(i, 1); }; srcs.push(s); } S.nextAt = when + Score.DUR - off; }
+  S.play = (t, onlyMusic = false) => { if (!S.ctx || !S.ready) return false; load(); S.stop(); musicOnly = onlyMusic; const now = S.ctx.currentTime + .06; startAt = now - t; sched(now, t); S.on = true; return true; };
+  function sched(when, off) { const stems = musicOnly ? [[mBuf, gM]] : [[mBuf, gM], [fBuf, gF]]; for (const [b, g] of stems) { const s = S.ctx.createBufferSource(); s.buffer = b; s.connect(g); s.start(when, off); s.onended = () => { const i = srcs.indexOf(s); if (i >= 0) srcs.splice(i, 1); }; srcs.push(s); } S.nextAt = when + Score.DUR - off; }
   S.stop = () => { srcs.forEach(s => { try { s.onended = null; s.stop(); } catch (e) { } }); srcs = []; S.on = false; };
   S.tick = () => { if (S.on && S.ctx.currentTime > S.nextAt - 1.5) sched(S.nextAt, 0); };
   S.time = () => { const lat = Math.min(.2, S.ctx.outputLatency || S.ctx.baseLatency || 0); return S.ctx.currentTime - startAt - lat; };     // film seconds, running on over loops

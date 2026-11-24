@@ -57,7 +57,7 @@ const Water = (() => {
   const MI = 14, impA = Array.from({ length: MI }, () => new THREE.Vector4()), impB = Array.from({ length: MI }, () => new THREE.Vector4()); let simA, simB, mSim, simClear = true; const steps = [], pend = []; const win = { x: -92, z: 0, px: -92, pz: 0 };
   let acc = 0, quiet = 999; const uWin = { value: new THREE.Vector4(-92, 0, SIZE, 0) };
   const impulse = (x, z, r, s, foam = 0, ringR = 0) => { pend.push([x, z, Math.max(r, .16), s, foam, ringR]); quiet = 0; };
-  function simUpdate(ctx) { const st = ctx.st, tx = Math.round(Math.min(st.pos.x, -82) / DX) * DX, tz = Math.round(clamp(st.pos.z, -60, 30) / DX) * DX; if (ctx.reset) { steps.length = 0; simClear = true; acc = 0; pend.length = 0; quiet = 999; win.x = tx; win.z = tz; }
+  function simUpdate(ctx) { const st = ctx.st, liveWater = ctx.freeRide && st.mode === 'float', tx = Math.round((liveWater ? st.pos.x : Math.min(st.pos.x, -82)) / DX) * DX, tz = Math.round(clamp(st.pos.z, liveWater ? -88 : -60, 30) / DX) * DX; if (ctx.reset) { steps.length = 0; simClear = true; acc = 0; pend.length = 0; quiet = 999; win.x = tx; win.z = tz; }
     acc = Math.min(acc + ctx.dt, .1); while (acc > STEP - 1e-5) { acc -= STEP; quiet += STEP; const sx = tx - win.x, sz = tz - win.z; win.x = tx; win.z = tz; if (quiet < 16) steps.push({ sx, sz, x: tx, z: tz, imp: pend.splice(0, MI) }); else if (sx || sz) steps.push({ sx, sz, x: tx, z: tz, imp: [] }); if (steps.length > 120) steps.shift(); } }
   function simRun() { if (simClear) { const c = R.getRenderTarget(); for (const s of [simA, simB]) { R.setRenderTarget(s); R.setClearColor(0, 0); R.clear(); } R.setRenderTarget(c); simClear = false; }
     const u = mSim.uniforms; for (const s of steps) { u.uShift.value.set(s.sx / SIZE, s.sz / SIZE); u.uC.value.set(s.x, s.z); u.uN.value = s.imp.length; s.imp.forEach((q, i) => { impA[i].set(q[0], q[1], q[2], q[3]); impB[i].set(q[4], q[5], 0, 0); }); u.tP.value = simA.texture; pass(mSim, simB); const t = simA; simA = simB; simB = t; } steps.length = 0; uWin.value.set(win.x, win.z, SIZE, quiet < 16 ? 1 : 0); }
@@ -177,7 +177,29 @@ const Water = (() => {
   function splash(x, z, r = .4, s = .5, foam = s * .5) { if (!isWater(x, z)) return; if (Math.abs(x - win.x) < SIZE * .48 && Math.abs(z - win.z) < SIZE * .48) impulse(x, z, r, -s, foam); else ring(x, z, .03 + .05 * s); if (s > .25 && dA) throwDrops(x, z, r, s, now); }
 
   // ---- what the score does to the water between t-dt and t ---------------------------------------------------------------------------------------------
-  let lastT = -1; const inStep = (a, t0, t1) => a > t0 && a <= t1;
+  let lastT = -1, rideContact = 0, rideWakeAt = 0, rideActive = false; const inStep = (a, t0, t1) => a > t0 && a <= t1;
+  function rideWater(ctx) {
+    const st = ctx.st, { x, z } = st.pos;
+    if (!rideActive || st.touchdown < rideContact || st.t + 1 < rideWakeAt) {
+      rideContact = st.touchdown;
+      rideWakeAt = st.t;
+    }
+    rideActive = true;
+    if (st.touchdown > rideContact) {
+      rideContact = st.touchdown;
+      if (st.touchdownWet) {
+        splash(x, z, .86, 1.3, .75);
+        ring(x, z, .11, ctx.t);
+      }
+    }
+    if (st.mode === 'float' && st.speed > .25 && st.t >= rideWakeAt) {
+      const strength = clamp(st.speed / 4.6);
+      const tailX = x - Math.cos(st.yaw) * .82, tailZ = z + Math.sin(st.yaw) * .82;
+      ring(x, z, .028 + .044 * strength, ctx.t);
+      impulse(tailX, tailZ, .41, -.50 * strength, .16 * strength);
+      rideWakeAt = st.t + .28;
+    }
+  }
   function scripted(ctx) { const t = ctx.t, t0 = ctx.reset ? t - 1e-6 : t - ctx.dt, st = ctx.st; if (t < 50 || t - t0 > .2) return;
     if (inStep(TOUCH, t0, t)) { const F = feet(TOUCH); impulse(F.s.pos.x, F.s.pos.z, 1.0, -4.2, .9); impulse(F.s.pos.x - .6, F.s.pos.z + .1, .55, -2.4, .8); }
     if (t > TOUCH && t < TOUCH + 4.2) { const F = feet(t), sp = F.s.speed, k = clamp(sp / 9); if (t < TOUCH + 2.9) for (const s of [-1, 1]) { const p = F.at(s, -.6); impulse(p.x, p.z, .26, -2.1 * k, .13 * k); } const hull = sm(TOUCH + .5, TOUCH + 1.4, t), b = F.at(0, -1.0), w = F.at(0, .9); if (sp > .25) { impulse(b.x, b.z, .42, .55 * k * hull * 1.6, .03 * k); impulse(w.x, w.z, .5, -.5 * k * hull, .05 * k); } }
@@ -207,7 +229,7 @@ const Water = (() => {
     surf = new THREE.Mesh(surfGeo(), surfMat()); surf.frustumCulled = false; surf.renderOrder = -20; surf.name = 'water'; bedM = bed(); buildSpray(); [drops, sheets, mist].forEach(o => o.layers.enable(1));
     const pg = Geo.merge([Geo.at(Geo.plane(B.x1 - B.x0, 1), 0, 0, 0)].slice(0, 0).concat([Geo.at(Geo.plane(-73.6 - B.x0, B.z1 - B.z0), (B.x0 - 73.6) / 2, WL, (B.z0 + B.z1) / 2, -PI / 2), Geo.at(Geo.plane(B.x1 + 73.6, -46 - B.z0), (B.x1 - 73.6) / 2, WL, (B.z0 - 46) / 2, -PI / 2), Geo.at(Geo.plane(104, 6), -22, WL, 12.5, -PI / 2)])); pickM = new THREE.Mesh(pg, new THREE.MeshBasicMaterial()); pickM.material.visible = false; W.pick = [pickM];
     const g = [surf, bedM, drops, sheets, mist, pickM]; if (Q.has('wtest')) g.push(wtest()); if (typeof Phys !== 'undefined' && Phys.on) Phys.on((k, b, s) => { if (k === 'water') splash(b.p.x, b.p.z, .28, clamp((s || 2) / 6, .3, 1), .2); }); return g; }
-  function update(ctx) { T = now = ctx.t; if (ctx.reset) { bellAt.clear(); liveR.length = 0; } simUpdate(ctx); scripted(ctx); const gold = Sky.S.night; U.uGold.value = gold * 1.1 * sm(54, 62, ctx.t); U.uFoamL.value.set(.10, .055, .022).multiplyScalar(gold); U.uBreeze.value = breeze(ctx.t) * (1 + .12 * Score.env('strings', ctx.t, 1.2)); const st = ctx.st; U.uBird.value.set(st.pos.x, st.pos.z, sm(TOUCH, TOUCH + 1, ctx.t)); const sp = ctx.t > TOUCH - .1 && ctx.t < TOUCH + 6.5; sheets.visible = mist.visible = sp; lastT = ctx.t; }
+  function update(ctx) { T = now = ctx.t; if (ctx.reset) { bellAt.clear(); liveR.length = 0; } simUpdate(ctx); if (ctx.freeRide) rideWater(ctx); else { rideActive = false; scripted(ctx); } const gold = Sky.S.night; U.uGold.value = gold * 1.1 * sm(54, 62, ctx.t); U.uFoamL.value.set(.10, .055, .022).multiplyScalar(gold); U.uBreeze.value = breeze(ctx.t) * (1 + .12 * Score.env('strings', ctx.t, 1.2)); const st = ctx.st; U.uBird.value.set(st.pos.x, st.pos.z, ctx.freeRide ? st.float : sm(TOUCH, TOUCH + 1, ctx.t)); const sp = !ctx.freeRide && ctx.t > TOUCH - .1 && ctx.t < TOUCH + 6.5; sheets.visible = mist.visible = sp; lastT = ctx.t; }
   function prepass(rd, scene, cam, ctx) { R = rd; const old = R.getRenderTarget(), ac = R.autoClear, vis = bedM.visible; R.autoClear = false; if (!baked) { baked = true; bake(scene); } U.uC.value.set(cam.position.x, cam.position.z); bedM.visible = LU.uPrint.value < .995; ringsUpdate(ctx, cam); waveStep(Q.has('tod') && Q.has('t') ? ctx.t : ctx.t); simRun(); U.tSim.value = simA.texture; reflect(scene, cam); R.setRenderTarget(old); R.autoClear = ac; }
   const W = Assets.add('water', { order: 70, build, update, prepass, pick: [], poke(hit, ctx) { const p = hit.point; const cm = ctx.cam.position; if (!isWater(p.x, p.z) || hit.distance > 110 || (p.z < -44 && p.x > -72 && cm.z > -40 && cm.y < 6)) return false; ring(p.x, p.z, .05, ctx.t); splash(p.x, p.z, .25, .7, .2); Score.live('bell', { t: ctx.t, m: Score.quant(84, ctx.t), v: .5 }); return true; } });
 

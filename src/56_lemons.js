@@ -2,7 +2,9 @@
 // ---- THE LEMON XYLOPHONE (bars 12-17): one lemon hops the tune along the crockery; every contact is a written note. Between contacts it is
 // in free fall (g = 9.81), so height and timing agree by themselves; after its last note it is thrown into the pelican's open bill ----------------
 const Lemons = (() => {
-  const g = 9.81, A = Score.tracks.lemon, A2 = Score.tracks.lemon2, OFF = -2.25, R = .105; let root, objs = [], hero, hero2, leaf, trail, trail2, rings, ringN = 0, spilled = false, lastT = -1, lit = []; const tmp = V3(), L = {};
+  const g = 9.81, A = Score.tracks.lemon, A2 = Score.tracks.lemon2, OFF = -2.25, R = .105;
+  const objs = [], lit = [], tmp = V3(), L = {};
+  let root, hero, hero2, leaf, trail, trail2, rings, spilled = false, rideMode = false, rideTime = 0;
   const yOf = m => clamp(.74 + (m - 66) * .047, .5, 1.72), zRow = i => -3.56 + .10 * Math.sin(i * 2.1);
   // contact list: {t, p (lemon centre), m, kind}
   function contacts(T, row) { return T.map((e, i) => { const x = Path.xAt(e.t) + OFF; return { t: e.t, d: e.d, m: e.m, i, p: V3(x, (row ? yOf(e.m) * .62 + .02 : yOf(e.m)) + R, row ? -3.13 + .05 * Math.sin(i * 1.7) : zRow(i)) }; }); }
@@ -43,21 +45,89 @@ const Lemons = (() => {
   const hue = m => new THREE.Color().setHSL(fract((m - 60) / 24 * .9 + .06), .75, .62), RC = []; for (let m = 40; m < 100; m++) RC[m] = hue(m);
   function ribbon(mesh, S, t, cam) { const n = mesh.userData.n, P = mesh.geometry.attributes.position.array, U = mesh.geometry.attributes.aU.array; let k = 0; const a = V3(), b = V3(), d = V3(), v = V3(), s = V3(); for (let i = 0; i < n; i++) { const u = i / (n - 1), tt = t - u * .95; let p = at(S, tt, a); if (!p) { if (tt < S[0].t0) a.copy(S[0].a); else { mesh.visible = false; return; } } const tb = Math.max(S[0].t0, tt - .012); at(S, tb, b) || b.copy(a); d.subVectors(a, b); if (d.lengthSq() < 1e-8) d.set(1, 0, 0); v.subVectors(a, cam.position); s.crossVectors(d, v).normalize().multiplyScalar(.042 * (1 - u * .55)); P[k * 3] = a.x + s.x; P[k * 3 + 1] = a.y + s.y; P[k * 3 + 2] = a.z + s.z; U[k * 2] = u; U[k * 2 + 1] = 1; k++; P[k * 3] = a.x - s.x; P[k * 3 + 1] = a.y - s.y; P[k * 3 + 2] = a.z - s.z; U[k * 2] = u; U[k * 2 + 1] = -1; k++; } mesh.geometry.attributes.position.needsUpdate = mesh.geometry.attributes.aU.needsUpdate = true; mesh.visible = true; }
   function spill() { const x = -46.4, r = rng(99); for (let i = 0; i < 34; i++) Phys.add({ x: x + 1.55 - r() * 2.3, y: 1.15 + r() * .45, z: -4.05 - r() * .3, vx: -2.0 + r() * 2.6, vy: 1.9 + r() * 2.6, vz: .9 + r() * 2.3, r: .078 + r() * .02 }); if (typeof Stalls !== 'undefined' && Stalls.bump) Stalls.bump(Score.CUE.BUMP); }
-  function update(ctx) {
-    const t = ctx.t, B = Score.CUE.BUMP; root.visible = t > 20 && t < 60; if (ctx.reset) { spilled = t > B + .1; if (spilled && t < B + 14) { spill(); } } if (!spilled && t >= B && t < B + 2) { spilled = true; spill(); } if (t < B - .5) spilled = false;
+  function ring(p, m, t, s) {
+    if (lit.length === 48) lit.shift();
+    lit.push({ p: p.clone(), m, t, s });
+  }
+
+  function playCrockery(q, ctx, velocity) {
+    const e = Score.live('lemon', { t: ctx.t, m: q.m, v: velocity });
+    const hitTime = rideMode ? rideTime + e.t - ctx.t : e.t;
+    if (rideMode) q.rideHit = hitTime;
+    else q.hit = hitTime;
+    const p = q.o.position;
+    ring(V3(p.x, q.by + q.o.userData.top + R, p.z), q.m, hitTime, 1);
+  }
+
+  function strikeCrockery(ctx) {
+    if (Math.abs(ctx.st.pos.x - C1[1].p.x) >= 43) return;
+    for (const b of Phys.bodies) {
+      if (!b.live || b.held || b.float || b.v.y >= -.45 || b.p.x > -43 || b.p.x < -67 || b.p.z > -2.7 || b.p.z < -4.2) continue;
+      const depth = Math.max(-b.v.y * ctx.dt, .025);
+      for (const q of objs) {
+        const { x, z } = q.o.position;
+        const top = q.by + q.o.userData.top + b.r;
+        const dy = b.p.y - top;
+        if (dy > 0 || dy < -depth || Math.hypot(b.p.x - x, b.p.z - z) > q.w / 2 + b.r) continue;
+        const velocity = clamp(-b.v.y / 7, .35, .95);
+        b.p.y = top + .004;
+        b.v.y *= -.54;
+        b.v.x *= .74;
+        b.v.z *= .74;
+        playCrockery(q, ctx, velocity);
+        break;
+      }
+    }
+  }
+
+  function updateChase(ctx) {
+    const t = ctx.t, B = Score.CUE.BUMP;
+    if (ctx.reset) { spilled = t > B + .1; if (spilled && t < B + 14) spill(); }
+    if (!spilled && t >= B && t < B + 2) { spilled = true; spill(); }
+    if (t < B - .5) spilled = false;
     if (!root.visible) return;
     if (typeof Pelican !== 'undefined' && Pelican.mouth && t > Score.CUE.GULP - .9 && t < Score.CUE.GULP) { Pelican.mouth(tmp); const st = ctx.st, st2 = Path.bird(Score.CUE.GULP); L.mouthP = (L.mouthP || V3()).set(tmp.x + st2.pos.x - st.pos.x, tmp.y, tmp.z + st2.pos.z - st.pos.z); }
     end1.p.copy(mouthAt());
     const spin = (o, S, t, r) => { const p = at(S, t, pos); o.visible = !!p && t >= B; if (!p) return; o.position.copy(p); const k = S.findIndex(s => t < s.t1), s = S[Math.max(0, k)], dt = t - s.t0; o.rotation.set(0, (k * 1.9) % 6.28, dt * (5 + (k % 3) * 2.5) * (k % 2 ? 1 : -1) + k * 1.3); const q = Math.exp(-dt * 26) * .28 * (k > 0 ? 1 : 0) + (s.t1 - t < .03 && !s.gulp ? .12 * (1 - (s.t1 - t) / .03) : 0); o.scale.set(r * (1 + q * .5), r * (1 - q), r * (1 + q * .5)); };
-    spin(hero, S1, t, R); spin(hero2, S2, t, R * .92); if (hero.visible) ribbon(trail, S1, t, ctx.cam); else trail.visible = false; if (hero2.visible) ribbon(trail2, S2, t, ctx.cam); else trail2.visible = false;
+    spin(hero, S1, t, R); spin(hero2, S2, t, R * .92);
+    trail.visible = hero.visible;
+    trail2.visible = hero2.visible;
+    if (trail.visible) ribbon(trail, S1, t, ctx.cam);
+    if (trail2.visible) ribbon(trail2, S2, t, ctx.cam);
+  }
+
+  function update(ctx) {
+    if (rideMode !== !!ctx.freeRide) { rideMode = !!ctx.freeRide; lit.length = 0; }
+    root.visible = rideMode || (ctx.t > 20 && ctx.t < 60);
+    if (rideMode) {
+      rideTime += ctx.dt;
+      hero.visible = hero2.visible = trail.visible = trail2.visible = false;
+      strikeCrockery(ctx);
+    } else updateChase(ctx);
+    if (!root.visible) return;
+    const t = rideMode ? rideTime : ctx.t;
     // contact: the thing dips, rocks on its post and rings
-    for (const o of objs) { const far = Math.abs(o.o.position.x - ctx.st.pos.x); o.o.children[0].castShadow = far < 8; o.o.visible = far < 26; const dt = t - o.c.t, lv = o.hit === undefined ? 1e9 : t - o.hit, u = Math.min(dt >= 0 ? dt : 1e9, lv >= 0 ? lv : 1e9); if (u > 3) { o.o.position.y = o.by; o.o.rotation.set(0, o.ry, 0); continue; } const dip = -.028 * Math.exp(-u * 9) * Math.cos(u * 34), k = Math.exp(-u * 2.6) * .10; o.o.position.y = o.by + dip; o.o.rotation.set(Math.sin(u * 15) * k, o.ry, Math.cos(u * 13) * k * .8 * (u > .02 ? 1 : 0)); }
+    for (const o of objs) { const far = Math.abs(o.o.position.x - ctx.st.pos.x); o.o.children[0].castShadow = far < 8; o.o.visible = far < 26; const dt = rideMode ? Infinity : t - o.c.t, lv = t - (rideMode ? o.rideHit : o.hit), u = Math.min(dt >= 0 ? dt : Infinity, lv >= 0 ? lv : Infinity); if (u > 3) { o.o.position.y = o.by; o.o.rotation.set(0, o.ry, 0); continue; } const dip = -.028 * Math.exp(-u * 9) * Math.cos(u * 34), k = Math.exp(-u * 2.6) * .10; o.o.position.y = o.by + dip; o.o.rotation.set(Math.sin(u * 15) * k, o.ry, Math.cos(u * 13) * k * .8 * (u > .02 ? 1 : 0)); }
     // rings
-    let k = 0; const P = rings.geometry.attributes.aP, C = rings.geometry.attributes.aC; const put = (p, u, m, s) => { if (k >= 48) return; const c = RC[clamp(m | 0, 40, 99)]; P.setXYZW(k, p.x, p.y - R, p.z, .06 + (1 - Math.exp(-u * 5)) * .44 * s); C.setXYZW(k, c.r, c.g, c.b, Math.exp(-u * 5.5) * 1.3); k++; }; for (const C_ of [C1, C2]) for (const c of C_) { const u = t - c.t; if (u >= 0 && u < .8) put(c.p, u, c.m, 1); } for (const r of lit) { const u = t - r.t; if (u >= 0 && u < .8) put(r.p, u, r.m, r.s || 1); } while (lit.length && t - lit[0].t > 1) lit.shift(); rings.geometry.instanceCount = k; P.needsUpdate = C.needsUpdate = true; rings.visible = k > 0;
+    let k = 0;
+    const P = rings.geometry.attributes.aP, C = rings.geometry.attributes.aC;
+    const put = (p, u, m, s) => {
+      if (k >= 48 || u < 0 || u >= .8) return;
+      const c = RC[clamp(m | 0, 40, 99)];
+      P.setXYZW(k, p.x, p.y - R, p.z, .06 + (1 - Math.exp(-u * 5.5)) * .44 * s);
+      C.setXYZW(k++, c.r, c.g, c.b, Math.exp(-u * 5.5) * 1.3);
+    };
+    if (!rideMode) for (const contacts of [C1, C2]) for (const c of contacts) put(c.p, t - c.t, c.m, 1);
+    for (const r of lit) put(r.p, t - r.t, r.m, r.s || 1);
+    while (lit.length && t - lit[0].t > 1) lit.shift();
+    rings.geometry.instanceCount = k; P.needsUpdate = C.needsUpdate = true; rings.visible = k > 0;
   }
   // a loose lemon striking the crockery plays it too
-  Phys.on((kind, b, s, n) => { if (kind !== 'wood' && kind !== 'stone' && kind !== 'cloth') return; if (b.p.x < -66.5 || b.p.x > -43.5 || b.p.z > -2.8) return; let best = null, bd = .3; for (const o of objs) { const d = Math.hypot(b.p.x - o.o.position.x, b.p.z - o.o.position.z); if (d < bd) { bd = d; best = o; } } if (best) best.hit = G.t; });
-  Object.assign(L, { pos: (t, out) => at(S1, t, out), C1, C2, ring: (p, m, t, s) => lit.push({ p: p.clone(), m, t, s }), get objs() { return objs; } });
-  Assets.add('lemons', { order: 57, build, update, get pick() { return objs.map(o => o.o); }, poke(hit, ctx) { let o = hit.object; while (o && !objs.some(q => q.o === o)) o = o.parent; const q = objs.find(z => z.o === o); if (!q) return; const e = Score.live('lemon', { t: ctx.t, m: q.m, v: .9 }); q.hit = e.t; lit.push({ p: V3(q.o.position.x, q.o.position.y + q.o.userData.top + R, q.o.position.z), m: q.m, t: e.t }); return null; } });
+  Phys.on((kind, b) => { if (rideMode || (kind !== 'wood' && kind !== 'stone' && kind !== 'cloth')) return; if (b.p.x < -66.5 || b.p.x > -43.5 || b.p.z > -2.8) return; let best = null, bd = .3; for (const o of objs) { const d = Math.hypot(b.p.x - o.o.position.x, b.p.z - o.o.position.z); if (d < bd) { bd = d; best = o; } } if (best) best.hit = G.t; });
+  Object.assign(L, { pos: (t, out) => at(S1, t, out), C1, C2, ring: (p, m, t, s) => ring(p, m, rideMode ? rideTime : t, s), get objs() { return objs; } });
+  Assets.add('lemons', { order: 57, build, update,
+    get pick() { return root?.visible ? objs.filter(q => q.o.visible).map(q => q.o) : []; },
+    poke(hit, ctx) { let o = hit.object; while (o && !objs.some(q => q.o === o)) o = o.parent; const q = objs.find(item => item.o === o); if (q) playCrockery(q, ctx, .9); return null; },
+  });
   return L;
 })();

@@ -1,7 +1,7 @@
 'use strict';
 // ---- MAIN: renderer, build, clock, frame. Studio mode (?studio=name) shows single assets under the film's light ---------------------------
 const Main = (() => {
-  const cv = document.getElementById('c'); let frameN = 0, R, scene, cam, W = 0, H = 0, last = -1, started = false, quality = 1; const ctx = { t: 0, dt: 1 / 60, st: null, reset: true, live: !CAPTURE };
+  const cv = document.getElementById('c'); let frameN = 0, R, scene, cam, W = 0, H = 0, last = -1, quality = 1; const ctx = { t: 0, dt: 1 / 60, st: null, reset: true, live: !CAPTURE, freeRide: false };
   const STUDIO = Q.get('studio');
   function size(force) { const cw = innerWidth, ch = innerHeight, dpr = CAPTURE ? 1 : Math.min(devicePixelRatio || 1, 2); let k = dpr * quality; const MAX = CAPTURE ? 1e9 : 3.7e6; if (cw * ch * k * k > MAX) k = Math.sqrt(MAX / (cw * ch)); const w = Math.max(2, Math.round(cw * k)), h = Math.max(2, Math.round(ch * k)); if (w === W && h === H && !force) return; W = w; H = h; R.setPixelRatio(1); R.setSize(W, H, false); Post.size(W, H); cam.aspect = W / H; cam.updateProjectionMatrix(); }
   const tick = () => new Promise(r => setTimeout(r, 0));
@@ -13,11 +13,22 @@ const Main = (() => {
     if (STUDIO) Studio.build();
     G.info.load = Math.round(performance.now()); R.compile(scene, cam);
   }
-  function update(t, dt, reset) { ctx.t = t; ctx.dt = dt; ctx.reset = reset; LU.uTime.value = t; LU.uBeat.value = t / Score.BEAT; ctx.st = Path.bird(t); if (STUDIO) Studio.pre(ctx); else { const s = ctx.st; Wind.wake(0, s.pos.x, s.pos.y + 1.6, s.pos.z, s.mode === 'fly' ? 5 : 1.9, s.vel.x, s.vel.y, s.vel.z, s.mode === 'fly' ? .22 : .10); }
-    if (typeof Film !== 'undefined' && !STUDIO) Film.update(ctx);
+  function update(t, dt, reset, freeRide = false) {
+    ctx.t = t; ctx.dt = dt; ctx.reset = reset; ctx.freeRide = freeRide;
+    LU.uTime.value = t; LU.uBeat.value = t / Score.BEAT;
+    ctx.st = freeRide ? Ride.step(dt) : Path.bird(t);
+    if (STUDIO) Studio.pre(ctx);
+    else {
+      const s = ctx.st;
+      Wind.wake(0, s.pos.x, s.pos.y + 1.6, s.pos.z, s.mode === 'fly' ? 5 : 1.9, s.vel.x, s.vel.y, s.vel.z, s.mode === 'fly' ? .22 : .10);
+    }
+    if (freeRide) {
+      RideShow.styleFrame(dt);
+      Ride.camera(ctx);
+    } else if (typeof Film !== 'undefined' && !STUDIO) Film.update(ctx);
     for (const a of Assets.list) if (a.ok && a.update) { try { a.update(ctx); } catch (e) { if (!a.err) { a.err = 1; G.errors.push(a.name + ' update: ' + (e.stack || e)); console.error('UPDATE ' + a.name, e.stack || e); } } }
     last = t; }
-  function draw() { const o = STUDIO ? Studio.view(ctx) : typeof Film !== 'undefined' ? Film.view(ctx) : { focus: 8 }; cam.updateMatrixWorld(); R.info.reset(); const f = o.lightFocus || ctx.st.pos; Sky.apply(o.tod === undefined ? ctx.t : o.tod, f, o.lightBox || 34); Post.fin.uExp.value = Sky.S.ex * (o.exposure || 1); Lan.update(f.x, f.z, o.lanGain === undefined ? lerp(.10, 1, Sky.S.night) : o.lanGain);
+  function draw() { const o = ctx.freeRide ? RideShow.view(ctx) : STUDIO ? Studio.view(ctx) : typeof Film !== 'undefined' ? Film.view(ctx) : { focus: 8 }; cam.updateMatrixWorld(); R.info.reset(); const f = o.lightFocus || ctx.st.pos; Sky.apply(o.tod === undefined ? ctx.t : o.tod, f, o.lightBox || 34); Post.fin.uExp.value = Sky.S.ex * (o.exposure || 1); Lan.update(f.x, f.z, o.lanGain === undefined ? lerp(.10, 1, Sky.S.night) : o.lanGain);
     R.shadowMap.autoUpdate = false; R.shadowMap.needsUpdate = false; const oddOnly = !CAPTURE && !ctx.reset && ctx.t > 1 && ctx.t < 48; for (const a of Assets.list) if (a.ok && a.prepass) { if (oddOnly && a.name === 'water' && (frameN & 1) === 1) continue; try { a.prepass(R, scene, cam, ctx); } catch (e) { if (!a.perr) { a.perr = 1; console.error('PREPASS ' + a.name, e.stack || e); } } }
     frameN++; R.shadowMap.autoUpdate = false; R.shadowMap.needsUpdate = CAPTURE || ctx.reset || (frameN & 1) === 0; Post.render(scene, cam, o); G.info.tris = R.info.render.triangles; G.info.calls = R.info.render.calls; G.info.w = W; G.info.h = H; }
   // exact frame for QA: a jump warms the springs and cloth up over the 1.6 s before it

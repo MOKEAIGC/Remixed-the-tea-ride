@@ -3,13 +3,195 @@
 <style>
 html,body{margin:0;height:100%;background:#e9d9b6;overflow:hidden}
 canvas#c{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;display:block;touch-action:none;cursor:grab}
+canvas#c:focus{outline:none}
 #ld{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#ecdcba;color:#1d2a44;font:500 13px/1.4 Georgia,"Iowan Old Style",serif;letter-spacing:.06em;transition:opacity .8s;z-index:5}
 #ld b{font-size:40px;font-weight:500;letter-spacing:.02em}
 #bar{width:200px;height:2px;background:rgba(29,42,68,.14);margin:22px 0 10px;position:relative}#bar s{position:absolute;left:0;top:0;height:2px;width:0;background:#c63a2a}
 #st{font:500 10px/1 -apple-system,system-ui,sans-serif;opacity:.55;letter-spacing:.14em;text-transform:uppercase}
 #hud{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);font:600 11px/1.2 -apple-system,system-ui,sans-serif;letter-spacing:.05em;color:#1d2a44;background:rgba(246,236,212,.82);padding:9px 14px;border-radius:999px;transition:opacity .8s;opacity:0;pointer-events:none;z-index:4;white-space:nowrap;max-width:94vw;overflow:hidden;text-overflow:ellipsis}
+[hidden]{display:none!important}
+#ride-menu,#ride-interface,#ride-film-entry,#ride-scene{font:600 13px/1.3 system-ui,sans-serif;color:#1d2a44;letter-spacing:normal}
+#ride-menu{display:flex;flex-wrap:wrap;justify-content:center;gap:9px;margin:25px 20px 0}
+.ride-button{border:1px solid #a8987b;border-radius:7px;padding:9px 13px;color:#1d2a44;background:#f8eed9;cursor:pointer;font:inherit}
+.ride-button:hover{background:#fff7e6}
+.ride-button:focus-visible{outline:2px solid #f8eed9;outline-offset:2px;box-shadow:0 0 0 4px #1d2a44}
+.ride-button--primary{background:#a33226;color:#fff7e6;border-color:#8f2a20}
+.ride-button--primary:hover{background:#b63b2e}
+#ride-menu .ride-button{padding:12px 25px}
+#ride-interface{position:fixed;inset:0;pointer-events:none;z-index:4}
+#ride-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin:max(12px,env(safe-area-inset-top)) 14px 0}
+#ride-status,#ride-legend{border:1px solid #a8987b;border-radius:8px;background:rgba(248,238,217,.96);box-shadow:0 2px 12px #1625372b}
+#ride-status{display:grid;grid-template-columns:auto auto;column-gap:11px;row-gap:3px;padding:8px 12px}
+#ride-location{grid-column:1/-1;font-size:14px}
+#ride-progress,#ride-speed{color:#565a62;font-size:11px;white-space:nowrap}
+#ride-motion{grid-column:1/-1;color:#3f5269;font-size:11px}
+#ride-combo{grid-column:1/-1;justify-self:start;pointer-events:auto;display:flex;align-items:center;gap:7px;padding:3px 6px;margin-top:2px;font-size:11px}
+#ride-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+#ride-actions .ride-button,#ride-film-entry{pointer-events:auto;box-shadow:0 2px 12px #1625372b}
+#ride-panel-toggle{display:inline-flex;align-items:center;gap:7px;background:#25354d;border-color:#25354d;color:#fff8e8}
+#ride-panel-toggle:hover,#ride-panel-toggle[aria-expanded=true]{background:#394d69}
+.ride-sliders{width:13px;height:11px;position:relative;border-block:1px solid currentColor;box-sizing:border-box}
+.ride-sliders::before{content:"";position:absolute;left:0;right:0;top:4px;border-top:1px solid currentColor}
+.ride-sliders::after{content:"";position:absolute;left:2px;top:-2px;width:3px;height:3px;border-radius:50%;background:currentColor;box-shadow:6px 5px currentColor,2px 10px currentColor}
+#ride-film-entry{position:fixed;top:max(12px,env(safe-area-inset-top));right:14px;z-index:4}
+#ride-legend{position:absolute;bottom:max(16px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:flex;justify-content:center;flex-wrap:wrap;gap:6px 13px;width:max-content;max-width:calc(100vw - 42px);padding:8px 12px;font-size:11px}
+#ride-legend span{white-space:nowrap}
+#ride-legend kbd{font:inherit;font-weight:800;margin-right:5px}
+#ride-interface:has(#ride-panel:not([hidden])) #ride-legend{display:none}
+body.ride-active #hud{bottom:66px}
+.ride-glass{
+  background:#f6efdf;border:1px solid #e3d4bb;border-radius:16px;
+  box-shadow:0 18px 60px #18223745,0 1px 0 #fff9ed inset;
+}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .ride-glass{background:rgba(249,242,226,.81);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4)}
+}
+#ride-panel{
+  position:absolute;top:calc(max(12px,env(safe-area-inset-top)) + 48px);right:14px;
+  width:min(446px,calc(100vw - 28px));max-height:calc(100vh - 80px);max-height:calc(100dvh - 80px);
+  box-sizing:border-box;display:grid;grid-template-rows:auto auto minmax(0,1fr);overflow:hidden;
+  pointer-events:auto;z-index:2;
+}
+.ride-panel-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 18px 11px}
+.ride-panel-head h2,#ride-scene h2{font-size:17px;line-height:1.25;margin:0;font-weight:760}
+#ride-view-info{margin:3px 0 0;font-size:11px;color:#495b70}
+#ride-panel-close{width:33px;height:33px;padding:0;font-size:20px;color:#33465e}
+.ride-panel-options{display:flex;gap:6px;padding:0 18px 11px;border-bottom:1px solid #71553826}
+.ride-panel-options button{flex:1;border-color:transparent;background:#fff8ea8c}
+.ride-panel-options button:hover{background:#fffbf2}
+.ride-panel-options button[aria-pressed=true]{background:#27384f;border-color:#27384f;color:#fff7e6}
+#ride-panel-body{min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 18px 18px;scrollbar-color:#798499 transparent}
+.ride-command-group+.ride-command-group{margin-top:15px}
+.ride-command-group h3{margin:0 0 6px;font-size:12px;font-weight:760;color:#3f5168}
+.ride-command-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+#ride-scene-list{display:grid;gap:6px}
+.ride-command{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:4px 7px;min-height:41px;
+  width:100%;padding:8px 9px;text-align:left;border-color:#95847068;background:#fff9eeaf;
+}
+.ride-command:hover{background:#fffaf0;border-color:#a69273}
+.ride-command[data-held]{color:#fff7e6;background:#27384f;border-color:#27384f}
+.ride-command-title{align-self:center}
+.ride-command-detail{grid-column:1/-1;color:#4a5868;font-size:11px;font-weight:500}
+.ride-command[data-held] .ride-command-detail{color:#e3e9f2}
+.ride-key{
+  display:inline-grid;place-items:center;min-width:14px;min-height:14px;align-self:center;
+  padding:1px 4px;border:1px solid currentColor;border-radius:4px;font:700 10px/1.1 system-ui,sans-serif;
+  white-space:nowrap;opacity:.86;
+}
+.ride-command .ride-key{color:#53637a;opacity:1;border-color:#53637a5c}
+.ride-command[data-held] .ride-key{color:#fff7e6;border-color:#fff7e68c}
+#ride-panel [data-ride-hold]{touch-action:none;user-select:none}
+#ride-scene{
+  position:fixed;z-index:4;bottom:max(18px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+  box-sizing:border-box;width:min(465px,calc(100vw - 28px));padding:13px 15px;display:grid;
+  grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;align-items:center;
+}
+#ride-scene p{margin:3px 0 0;color:#495b70;font-size:11px}
+#ride-scene progress{grid-column:1/-1;width:100%;height:5px;accent-color:#a33226}
+#ride-touch{display:none;position:absolute;bottom:max(14px,env(safe-area-inset-bottom));left:14px;right:14px;align-items:flex-end;justify-content:space-between;gap:12px}
+#ride-touch .ride-button{min-width:46px;min-height:46px;padding:7px 9px;pointer-events:auto;touch-action:none;user-select:none;box-shadow:0 2px 8px #16253745}
+#ride-touch .ride-button[data-held]{background:#1d2a44;color:#fff7e6;border-color:#1d2a44}
+#ride-directions{display:grid;grid-template-areas:'. up .' 'left down right';gap:5px;font-size:18px}
+#ride-directions [data-ride-hold=forward]{grid-area:up}
+#ride-directions [data-ride-hold=left]{grid-area:left}
+#ride-directions [data-ride-hold=back]{grid-area:down}
+#ride-directions [data-ride-hold=right]{grid-area:right}
+#ride-touch-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+@media (pointer:coarse){
+  #ride-touch{display:flex}
+  #ride-legend{display:none}
+  #ride-panel{max-height:calc(100vh - 175px);max-height:calc(100dvh - 175px)}
+  body.ride-active #hud{bottom:122px}
+}
+@media(max-width:460px){
+  #ride-top{margin-inline:9px}
+  #ride-top .ride-button{padding:8px 7px;font-size:12px}
+  #ride-top #ride-reset-button{display:none}
+  #ride-status{column-gap:7px;padding:7px 8px}
+  #ride-location{font-size:12px}
+  .ride-panel-head,.ride-panel-options,#ride-panel-body{padding-inline:12px}
+  #ride-touch{left:9px;right:9px;gap:7px}
+  #ride-touch .ride-button{min-width:42px;padding-inline:6px}
+}
+@media(max-width:325px){
+  #ride-touch-actions .ride-button{min-width:36px;padding-inline:4px;font-size:11px}
+}
 </style></head>
-<body><canvas id="c"></canvas><div id="ld"><b>The Tea Ride</b><div id="bar"><s></s></div><div id="st">carving the blocks</div></div><div id="hud"></div>
+<body>
+<canvas id="c" tabindex="-1"></canvas>
+<div id="ld">
+  <b>The Tea Ride</b>
+  <div id="bar"><s></s></div>
+  <div id="st">carving the blocks</div>
+  <div id="ride-menu" lang="zh-CN" role="group" aria-label="选择模式" hidden>
+    <button type="button" class="ride-button ride-button--primary" data-ride-mode="ride">自由骑行</button>
+    <button type="button" class="ride-button" data-ride-mode="film">播放短片</button>
+  </div>
+</div>
+<div id="hud"></div>
+<button id="ride-film-entry" lang="zh-CN" type="button" class="ride-button" data-ride-mode="ride" hidden>自由骑行</button>
+<div id="ride-interface" lang="zh-CN" hidden>
+  <div id="ride-top">
+    <div id="ride-status">
+      <span id="ride-location"></span>
+      <span id="ride-progress" aria-live="polite"></span>
+      <span id="ride-speed"></span>
+      <span id="ride-motion" hidden></span>
+      <button id="ride-combo" type="button" class="ride-button" data-ride-action="cancelCombo" title="结束组合 (Esc)" hidden><span id="ride-combo-label"></span><span aria-hidden="true">×</span></button>
+    </div>
+    <div id="ride-actions">
+      <button id="ride-reset-button" type="button" class="ride-button" data-ride-action="reset" title="返回起点 (R)">返回起点</button>
+      <button type="button" class="ride-button" data-ride-mode="film">播放短片</button>
+      <button id="ride-panel-toggle" type="button" class="ride-button" aria-expanded="false" aria-controls="ride-panel" aria-keyshortcuts="H">
+        <span class="ride-sliders" aria-hidden="true"></span>控制台 <kbd class="ride-key" aria-hidden="true">H</kbd>
+      </button>
+    </div>
+  </div>
+  <div id="ride-legend" aria-label="键盘和鼠标操作">
+    <span><kbd>WASD / 方向键</kbd>移动</span>
+    <span><kbd>Shift</kbd>加速</span>
+    <span><kbd>空格</kbd>起飞</span>
+    <span><kbd>C</kbd>降落</span>
+    <span><kbd>Z / X</kbd>升降</span>
+    <span><kbd>H</kbd>控制台</span>
+  </div>
+  <div id="ride-touch" role="group" aria-label="触控骑行">
+    <div id="ride-directions">
+      <button type="button" class="ride-button" data-ride-hold="forward" aria-label="前进">↑</button>
+      <button type="button" class="ride-button" data-ride-hold="left" aria-label="左转">←</button>
+      <button type="button" class="ride-button" data-ride-hold="back" aria-label="后退">↓</button>
+      <button type="button" class="ride-button" data-ride-hold="right" aria-label="右转">→</button>
+    </div>
+    <div id="ride-touch-actions">
+      <button type="button" class="ride-button" data-ride-hold="sprint">加速</button>
+      <button type="button" class="ride-button" data-ride-hold="ascend">上升</button>
+      <button type="button" class="ride-button" data-ride-hold="descend">下降</button>
+      <button type="button" class="ride-button" data-ride-action="takeoff">起飞</button>
+      <button type="button" class="ride-button" data-ride-action="land">降落</button>
+      <button type="button" class="ride-button" data-ride-action="sip">喝茶</button>
+    </div>
+  </div>
+  <section id="ride-panel" class="ride-glass" aria-labelledby="ride-panel-title" tabindex="-1" hidden>
+    <header class="ride-panel-head">
+      <div><h2 id="ride-panel-title">骑行控制台</h2><p id="ride-view-info" hidden></p></div>
+      <button id="ride-panel-close" type="button" class="ride-button" title="收起控制台 (Esc)" aria-label="收起控制台" aria-keyshortcuts="Escape">×</button>
+    </header>
+    <div class="ride-panel-options" role="group" aria-label="控制台内容">
+      <button id="ride-show-actions" type="button" class="ride-button" aria-controls="ride-command-list" aria-pressed="true">动作与视角</button>
+      <button id="ride-show-scenes" type="button" class="ride-button" aria-controls="ride-scene-list" aria-pressed="false">位点演出</button>
+    </div>
+    <div id="ride-panel-body">
+      <div id="ride-command-list"></div>
+      <div id="ride-scene-list" hidden></div>
+    </div>
+  </section>
+</div>
+<section id="ride-scene" class="ride-glass" lang="zh-CN" aria-labelledby="ride-scene-title" hidden>
+  <div><h2 id="ride-scene-title">位点演出</h2><p id="ride-scene-detail" hidden></p></div>
+  <button type="button" class="ride-button" data-ride-action="stopScene" aria-keyshortcuts="Escape">返回骑行 <kbd class="ride-key" aria-hidden="true">Esc</kbd></button>
+  <progress id="ride-scene-progress" max="1" aria-label="演出进度" hidden></progress>
+</section>
 <script>var THREE=(function(){'use strict';var __core=(function(){'use strict';/**
  * @license
  * Copyright 2010-2025 Three.js Authors
@@ -1051,8 +1233,30 @@ const Pelican = (() => {
     else { const u = (c - S) / (2 - S); plant(k + 2, _v2); const w = smoother(.02, .97, u); _v.lerp(_v2, w); y = liftK(u); const sd = i ? 1 : -1; phi = lerp(lerp(.95, 1.35, sm(0, .28, u)), -.26, sm(.34, .94, u)); spr = lerp(.7, .30, sm(0, .3, u)); spr = lerp(spr, 1.06, sm(.62, 1, u)); curl = .85 * sm(.05, .35, u) * (1 - sm(.55, .9, u)); o.out = .07 * Math.sin(PI * u) * sd; }
     if (down) o.out = 0; const rx = _v.x - tp.pos.x, rz = _v.z - tp.pos.z, cy = Math.cos(tp.yaw), sy = Math.sin(tp.yaw); o.p.set(rx * cy - rz * sy, y - tp.pos.y, rx * sy + rz * cy + o.out); o.phi = phi; o.spr = spr; o.curl = curl; o.down = down; o.c = c; return o; }
 
+  function rideGait(i, st, out) {
+    const c = mod(st.phase - i, 2);
+    const stance = lerp(1.24, .76, st.run);
+    const stride = st.stepLength * st.direction;
+    const gait = st.gait;
+    const swing = clamp((c - stance) / (2 - stance));
+    const x = .10 + gait * stride * (stance * .5 - c + 2 * smoother(.02, .97, swing));
+    const z = (i ? 1 : -1) * (.235 + .05 * gait * Math.sin(PI * swing));
+    const cy = Math.cos(st.yaw), sy = Math.sin(st.yaw);
+    const worldX = st.pos.x + x * cy + z * sy;
+    const worldZ = st.pos.z - x * sy + z * cy;
+    const ground = Arch.ground(worldX, worldZ);
+    const rise = clamp(ground - st.pos.y, -.22, .33);
+    out.p.set(x, rise + liftK(swing) * gait, z);
+    const heel = lerp(-.17, .67, sm(.30, 1, c / stance));
+    const swingPitch = lerp(.67, -.17, sm(.18, .95, swing));
+    out.phi = (c < stance ? heel : swingPitch) * gait * (st.direction < 0 ? -.45 : 1);
+    out.spr = 1 - .26 * gait * Math.sin(PI * swing);
+    out.curl = .45 * gait * Math.sin(PI * swing);
+    out.down = c < stance || gait < .05;
+  }
+
   // ---- performance: what it does when -----------------------------------------------------------------------------------------------------------------------
-  const EV = { honk: [], gulp: [], open: [] };
+  const EV = { honk: [], gulp: [], open: [] }, rideHonks = [];
   const honks = t => { const L = EV.honk.filter(e => t >= e - .2 && t < e + 1.6); if (Math.abs(t - CUE.HONK - .6) < 1) L.push(CUE.HONK); return L; }, gulps = t => { const L = EV.gulp.filter(e => t >= e && t < e + 1.7); if (t >= CUE.GULP && t < CUE.GULP + 1.7) L.push(CUE.GULP); return L; }, opens = t => { const L = EV.open.filter(e => t >= e[0] - .1 && t < e[1] + .3); if (t > CUE.GULP - .8 && t < CUE.GULP + .3) L.push([CUE.GULP - .7, CUE.GULP]); return L; };
   // glances: [from, to, yaw (left +), pitch, roll] in the walk; smooth in, hold, smooth out
   const GL = [[1.2, 2.6, .10, .02, .05], [3.2, 4.6, -.16, .10, 0], [5.0, 6.6, .20, .16, .10], [7.2, 8.6, .34, -.04, -.06], [9.2, 11.7, -.62, .26, .12], [12.4, 13.4, .16, 0, -.10], [14.1, 16.4, .22, -.34, .10], [17.6, 18.8, -.30, .04, 0], [22.6, 23.8, .28, .06, -.12], [24.9, 27.0, .52, .06, .16], [29.0, 30.0, .10, .24, 0], [30.6, 32.0, -.42, -.10, .10], [33.4, 35.0, .32, -.06, .08], [36.0, 37.0, -.24, .12, -.10], [38.4, 40.0, .40, .0, .12], [40.9, 42.3, -.44, -.04, .06], [45.2, 46.6, .36, .04, .10], [49.2, 50.2, .18, .12, 0], [55.6, 57.4, .34, -.10, .08], [59.0, 60.6, -.30, -.16, -.06], [62.6, 64.0, .28, .06, .06], [65.0, 67.0, .46, .06, .14], [68.4, 69.6, -.30, -.16, 0], [75.2, 77.2, .48, .04, .14], [78.4, 80.2, -.22, .10, -.08]];
@@ -1063,36 +1267,46 @@ const Pelican = (() => {
   const glideAt = t => { const e = Score.last('flap', t); if (!e || t > T_TOUCH) return 0; const T = e.d, x = t - e.t; return T > 1.5 ? sm(.45, 1.0, x) * (1 - sm(T - .5, T, x)) : 0; };
 
   const POSES = { walk: [1.07, 1.73, .965, 2.06, .80, 2.34, 1.20, 2.85, -.35], run: [1.06, 1.62, 1.21, 1.86, 1.19, 2.06, 1.52, 2.50, -.22], fly: [1.18, 1.60, 1.31, 1.84, 1.00, 1.95, 1.03, 2.42, -.27], ski: [1.05, 1.74, .96, 2.02, .80, 2.28, 1.12, 2.70, -.30], float: [1.12, 1.70, 1.0, 1.98, .80, 2.24, 1.16, 2.72, -.42], honk: [1.0, 1.78, .96, 2.12, .94, 2.46, 1.14, 3.18, .34], gulp: [1.08, 1.72, 1.0, 1.98, .86, 2.22, 1.26, 2.70, .04], reach: [1.13, 1.70, 1.12, 1.94, 1.02, 2.14, 1.40, 2.56, -.10], preen: [1.09, 1.72, 1.0, 2.04, .82, 2.38, 1.28, 2.62, -1.15] };
-  const PW = new Float32Array(9), tp = {}; let tPose = null, look = { v: null, w: 0, y: 0, p: 0, k: 0 }; const _hp = V3(), _lm = V3();
+  const PW = new Float32Array(9), look = { v: null, w: 0, y: 0, p: 0, k: 0 }; const _hp = V3(), _lm = V3();
   const Mb = new THREE.Matrix4(), Ms = new THREE.Matrix4(), Mh = new THREE.Matrix4(), Mrel = new THREE.Matrix4(), qh = new THREE.Quaternion(), qr = new THREE.Quaternion(), qi = new THREE.Quaternion(), sp3 = { x: 0, y: 0, z: 0, px: 0, py: 0, pz: 0, vx: 0, vy: 0, vz: 0, init: false }, PSt = { x: 0, vx: 0, z: 0, vz: 0, d: 0, vd: 0 }, HL = { x: 0, vx: 0, y: 0, vy: 0, z: 0, vz: 0, r: 0, vr: 0 };
   const compose = (M, x, y, z, rx, ry, rz) => { _e.set(rx, ry, rz, 'YZX'); _q.setFromEuler(_e); _m.compose(_v.set(x, y, z), _q, _v3.set(1, 1, 1)); M.copy(_m).multiply(_m2.makeTranslation(-x * 0, -PIVY, 0)); };
   const state = { open: 0, f: 0 };
 
   function update(ctx) {
-    const t = ctx.t, st = ctx.st, dt = Math.min(.05, ctx.dt || 1 / 60); tPose = Path.bird(t); const T = tPose, p = T.phase;
-    group.position.copy(st.pos); const yEnd = Math.atan2(-.02, -1) + TAU, yS = t > 76 ? lerp(t > 77.55 ? Path.bird(77.55).yaw : T.yaw, yEnd, smoother(76.2, 78.8, t)) - T.yaw : 0; group.rotation.set(st.roll, st.yaw + yS, st.pitch, 'YZX');
+    const t = ctx.t, st = ctx.st, ride = ctx.freeRide, dt = Math.min(.05, ctx.dt || 1 / 60);
+    const T = ride ? st : Path.bird(t), p = T.phase;
+    group.position.copy(st.pos); const yEnd = Math.atan2(-.02, -1) + TAU, yS = !ride && t > 76 ? lerp(t > 77.55 ? Path.bird(77.55).yaw : T.yaw, yEnd, smoother(76.2, 78.8, t)) - T.yaw : 0; group.rotation.set(st.roll, st.yaw + yS, st.pitch, 'YZX');
     // ---- weights
-    const kRun = sm(T_RUN - .1, T_RUN + 1.0, t), kAir = sm(T_OFF - .05, T_OFF + .45, t), kGnd = 1 - kAir, kFly = sm(T_OFF + .1, T_OFF + 1.7, t) * (1 - sm(T_TOUCH - 1.0, T_TOUCH, t)), kSki = sm(T_TOUCH - 1.1, T_TOUCH - .1, t) * (1 - sm(T_TOUCH + 1.3, T_TOUCH + 3.0, t)), kFl = sm(T_TOUCH + 1.2, T_TOUCH + 3.2, t), kBrake = sm(T_TOUCH - 1.25, T_TOUCH - .45, t) * (1 - sm(T_TOUCH + .25, T_TOUCH + 1.3, t));
-    const fl = flapAt(t), fh = flapAt(t - .075), vf = (flapAt(t + .012) - flapAt(t - .012)) / .024, vfl = (flapAt(t - .05) - flapAt(t - .075)) / .025, gl = glideAt(t);
-    const hon = honks(t), gul = gulps(t), opn = opens(t); let hk = 0, hA = 0, hFl = 0, hShake = 0, hHop = 0, hOpen = 0; for (const e of hon) { const u = t - e; hk = Math.max(hk, sm(-.05, .13, u) * (1 - sm(.62, 1.15, u))); hA = Math.max(hA, sm(-.2, -.06, u) * (1 - sm(-.04, .08, u))); hOpen = Math.max(hOpen, sm(-.03, .09, u) * (1 - sm(.55, .86, u))); hFl = Math.max(hFl, sm(-.02, .20, u) * (1 - sm(.50, 1.15, u))); hShake += sm(.05, .25, u) * Math.exp(-Math.max(0, u - .2) * 3.2) * Math.sin(u * TAU * 8.5) * (u > 0 ? 1 : 0); hHop += u > .04 && u < .46 ? Math.sin(PI * (u - .04) / .42) * .13 : u >= .46 ? -.05 * Math.exp(-(u - .46) * 7) * Math.cos((u - .46) * 16) * sm(.46, .50, u) : 0; }
+    const kRun = ride ? st.run : sm(T_RUN - .1, T_RUN + 1.0, t);
+    const kAir = ride ? st.air : sm(T_OFF - .05, T_OFF + .45, t), kGnd = 1 - kAir;
+    const kFl = ride ? st.float : sm(T_TOUCH + 1.2, T_TOUCH + 3.2, t);
+    const kBrake = ride ? Number(st.landing) * (1 - sm(.65, 5.5, st.altitude)) * kAir : sm(T_TOUCH - 1.25, T_TOUCH - .45, t) * (1 - sm(T_TOUCH + .25, T_TOUCH + 1.3, t));
+    const kFly = ride ? kAir * (1 - kFl) * (1 - kBrake * .7) : sm(T_OFF + .1, T_OFF + 1.7, t) * (1 - sm(T_TOUCH - 1.0, T_TOUCH, t));
+    const kSki = ride ? kBrake * (1 - kFl) * .6 : sm(T_TOUCH - 1.1, T_TOUCH - .1, t) * (1 - sm(T_TOUCH + 1.3, T_TOUCH + 3.0, t));
+    const fl = ride ? st.flap : flapAt(t), fh = ride ? st.flapLag : flapAt(t - .075), vf = ride ? st.flapSpeed : (flapAt(t + .012) - flapAt(t - .012)) / .024, vfl = ride ? st.flapLagSpeed : (flapAt(t - .05) - flapAt(t - .075)) / .025, gl = ride ? st.glide : glideAt(t);
+    const hon = ride ? rideHonks.filter(e => st.t >= e - .2 && st.t < e + 1.6).map(e => t + e - st.t) : honks(t);
+    const gul = ride ? [] : gulps(t), opn = ride ? [] : opens(t); let hk = 0, hA = 0, hFl = 0, hShake = 0, hHop = 0, hOpen = 0; for (const e of hon) { const u = t - e; hk = Math.max(hk, sm(-.05, .13, u) * (1 - sm(.62, 1.15, u))); hA = Math.max(hA, sm(-.2, -.06, u) * (1 - sm(-.04, .08, u))); hOpen = Math.max(hOpen, sm(-.03, .09, u) * (1 - sm(.55, .86, u))); hFl = Math.max(hFl, sm(-.02, .20, u) * (1 - sm(.50, 1.15, u))); hShake += sm(.05, .25, u) * Math.exp(-Math.max(0, u - .2) * 3.2) * Math.sin(u * TAU * 8.5) * (u > 0 ? 1 : 0); hHop += u > .04 && u < .46 ? Math.sin(PI * (u - .04) / .42) * .13 : u >= .46 ? -.05 * Math.exp(-(u - .46) * 7) * Math.cos((u - .46) * 16) * sm(.46, .50, u) : 0; }
     let gOpen = 0, gTilt = 0, gSnap = 0, gLs = 0, gLa = 0, gPa = 0, gPs = .3, gJoy = 0; for (const e of opn) { const a = e[0], b = e[1]; gOpen = Math.max(gOpen, sm(a, lerp(a, b, .62), t) * (1 - sm(b, b + .085, t))); } for (const e of gul) { const u = t - e; gSnap += ring(t, e + .05, 5.2, 7.5); gTilt = Math.max(gTilt, sm(.16, .42, u) * (1 - sm(.78, 1.25, u))); gPa = Math.max(gPa, sm(.0, .07, u) * (1 - sm(.40, .62, u))); gPs = lerp(.52, .06, sm(.10, .60, u)); gLa = Math.max(gLa, sm(.46, .58, u) * (1 - sm(1.05, 1.32, u))); gLs = lerp(1.0, .06, sm(.48, 1.30, u)); gJoy += u > 1.0 ? Math.exp(-(u - 1.0) * 4) * Math.sin((u - 1) * 30) : 0; }
-    const reach = opn.length ? sm(opn[0][0], opn[0][1] - .12, t) * (1 - sm(opn[0][1] + .05, opn[0][1] + .35, t)) : 0, pr = PREEN.reduce((a, q) => Math.max(a, sm(q[0], q[0] + .5, t) * (1 - sm(q[1] - .45, q[1], t))), 0) * kGnd, shuf = SHUF.reduce((a, s) => a + (t > s && t < s + .9 ? Math.sin(PI * (t - s) / .9) * (.55 + .45 * Math.sin((t - s) * 34)) : 0), 0), wag = WAG.reduce((a, s) => a + (t > s && t < s + .8 ? Math.sin(PI * (t - s) / .8) * Math.sin((t - s) * 44) : 0), 0);
+    const reach = opn.length ? sm(opn[0][0], opn[0][1] - .12, t) * (1 - sm(opn[0][1] + .05, opn[0][1] + .35, t)) : 0, pr = ride ? 0 : PREEN.reduce((a, q) => Math.max(a, sm(q[0], q[0] + .5, t) * (1 - sm(q[1] - .45, q[1], t))), 0) * kGnd, shuf = ride ? 0 : SHUF.reduce((a, s) => a + (t > s && t < s + .9 ? Math.sin(PI * (t - s) / .9) * (.55 + .45 * Math.sin((t - s) * 34)) : 0), 0), wag = ride ? 0 : WAG.reduce((a, s) => a + (t > s && t < s + .8 ? Math.sin(PI * (t - s) / .8) * Math.sin((t - s) * 44) : 0), 0);
     // ---- body: heavy waddle locked to the steps
-    const le = Score.last('step', t), dStep = le ? t - le.t : 9, imp = kGnd * Math.exp(-dStep * 11) * Math.sin(Math.min(dStep * 24, 8)), bump = ring(t, CUE.BUMP, 2.6, 4.2) * kGnd, A = kGnd * lerp(1, .62, kRun), c1 = Math.cos(PI * (p - .60)), s2 = Math.cos(TAU * (p - .14));
+    const le = ride ? null : Score.last('step', t);
+    const gaitWeight = ride ? st.gait : 1;
+    const dStep = ride && st.speed > .1 ? fract(p) * st.stepLength / st.speed : le ? t - le.t : 9;
+    const imp = kGnd * gaitWeight * Math.exp(-dStep * 11) * Math.sin(Math.min(dStep * 24, 8)), bump = ride ? 0 : ring(t, CUE.BUMP, 2.6, 4.2) * kGnd, A = kGnd * gaitWeight * lerp(1, .62, kRun), c1 = Math.cos(PI * (p - .60)), s2 = Math.cos(TAU * (p - .14));
     const breath = Math.sin(t * 2.0) * .5 + .5, sw = kFl * Math.sin(t * 1.25) , pd = kFl * Math.sin(t * 2.4);
-    const heave = (1 - kGnd) * (-.075 * flapAt(t - .06) * (1 - kFl)) * (1 - kSki * .5);
-    const sinkY = keyedCR3(t), bob = -.046 * s2 * A * lerp(1, 1.3, kRun) - .026 * imp + .055 * bump + hHop - .05 * hA;
-    const roll = -.092 * c1 * A + .012 * hShake + .02 * sw + .02 * Math.sin(t * .83) * kFl, yawB = -.070 * Math.cos(PI * p) * A + .02 * Math.sin(t * .6) * kFl, pitchB = .020 * Math.sin(TAU * (p - .05)) * A - .085 * kRun * kGnd + .07 * hk - .02 * hA + .035 * sw * .6 + (1 - kGnd) * (.05 * flapAt(t - .04) * (1 - kFl)) + .16 * kBrake + .03 * gTilt - .05 * bump, swayZ = -.058 * c1 * A, surge = .018 * Math.sin(TAU * (p - .2)) * A;
-    const crouch = -.07 * sm(T_OFF - .34, T_OFF - .12, t) * (1 - sm(T_OFF - .1, T_OFF + .12, t)) - .05 * kRun * kGnd;
+    const heave = (1 - kGnd) * (-.075 * (ride ? fh : flapAt(t - .06)) * (1 - kFl)) * (1 - kSki * .5);
+    const sinkY = ride ? -.88 * kFl : keyedCR3(t), bob = -.046 * s2 * A * lerp(1, 1.3, kRun) - .026 * imp + .055 * bump + hHop - .05 * hA;
+    const roll = -.092 * c1 * A + .012 * hShake + .02 * sw + .02 * Math.sin(t * .83) * kFl, yawB = -.070 * Math.cos(PI * p) * A + .02 * Math.sin(t * .6) * kFl, pitchB = .020 * Math.sin(TAU * (p - .05)) * A - .085 * kRun * kGnd + .07 * hk - .02 * hA + .035 * sw * .6 + (1 - kGnd) * (.05 * (ride ? fh : flapAt(t - .04)) * (1 - kFl)) + .16 * kBrake + .03 * gTilt - .05 * bump, swayZ = -.058 * c1 * A, surge = .018 * Math.sin(TAU * (p - .2)) * A;
+    const crouch = (ride ? 0 : -.07 * sm(T_OFF - .34, T_OFF - .12, t) * (1 - sm(T_OFF - .1, T_OFF + .12, t))) - .05 * kRun * kGnd;
     const fl0 = .012 * Math.sin(t * 1.7) * kFl + .008 * Math.sin(t * 2.9 + 1) * kFl;
     compose(Ms, 0, PIVY + sinkY + crouch, 0, 0, 0, -.085 * kRun * kGnd + .16 * kBrake); compose(Mb, surge, PIVY + sinkY + crouch + bob + heave + fl0, swayZ, roll, yawB, pitchB); body.matrix.copy(Mb); body.matrixWorldNeedsUpdate = true;
     const sq = -.016 * imp - .02 * bump - .03 * hA + .025 * hk; torsoG.scale.set(1 - sq * .5, 1 + sq + .006 * breath, 1 - sq * .6 + .010 * breath); torsoG.position.y = PIVY * (1 - torsoG.scale.y) * .6;
     // ---- feather ruffles
-    const bs = Score.last('bass', t); UF.uRip.value.set(dStep, .12 * kGnd, bs ? t - bs.t : 9, (bs ? bs.v : 0) * .07 * (1 - kFly)); UF.uRuf.value.set(.02 + .04 * breath * .5 + .16 * hk + .10 * Math.max(0, gJoy) + .10 * Math.abs(shuf) + .12 * Math.max(0, bump) + .06 * kBrake, lerp(.02, .10, kFly) + .20 * gl * kFly + .07 * kRun * kGnd + .16 * kBrake + .10 * Math.abs(hShake), 0, 0); UN.uNR.value.set(.10 * breath + .55 * hk + .5 * gTilt, 1 + kFly * 1.2);
+    const bs = Score.last('bass', t); UF.uRip.value.set(dStep, .12 * kGnd * gaitWeight, bs ? t - bs.t : 9, (bs ? bs.v : 0) * .07 * (1 - kFly)); UF.uRuf.value.set(.02 + .04 * breath * .5 + .16 * hk + .10 * Math.max(0, gJoy) + .10 * Math.abs(shuf) + .12 * Math.max(0, bump) + .06 * kBrake, lerp(.02, .10, kFly) + .20 * gl * kFly + .07 * kRun * kGnd + .16 * kBrake + .10 * Math.abs(hShake), 0, 0); UN.uNR.value.set(.10 * breath + .55 * hk + .5 * gTilt, 1 + kFly * 1.2);
     // ---- neck + head
-    const nWalk = Math.max(0, 1 - Math.max(kRun * kGnd, 0) - kFly - kSki - kFl), W0 = [['walk', Math.max(nWalk, 0)], ['run', kRun * (1 - kFly) * (1 - sm(T_OFF + .4, T_OFF + 1.8, t))], ['fly', kFly], ['ski', kSki], ['float', kFl]]; let sum = 0; PW.fill(0); for (const [n, w] of W0) { sum += w; for (let i = 0; i < 9; i++) PW[i] += POSES[n][i] * w; } for (let i = 0; i < 9; i++) PW[i] /= sum;
+    const nWalk = Math.max(0, 1 - Math.max(kRun * kGnd, 0) - kFly - kSki - kFl), W0 = [['walk', Math.max(nWalk, 0)], ['run', kRun * (1 - kFly) * (ride ? 1 : 1 - sm(T_OFF + .4, T_OFF + 1.8, t))], ['fly', kFly], ['ski', kSki], ['float', kFl]]; let sum = 0; PW.fill(0); for (const [n, w] of W0) { sum += w; for (let i = 0; i < 9; i++) PW[i] += POSES[n][i] * w; } for (let i = 0; i < 9; i++) PW[i] /= sum;
     const ov = (n, w) => { if (w > 0) for (let i = 0; i < 9; i++) PW[i] = lerp(PW[i], POSES[n][i], w); }; ov('preen', pr); ov('reach', reach); ov('gulp', gTilt); ov('honk', hk);
-    let gy = 0, gp = 0, gr = 0; for (const q of GL) { if (t < q[0] - .1 || t > q[1] + .5) continue; const w = smoother(q[0], q[0] + .45, t) * (1 - smoother(q[1] - .1, q[1] + .42, t)); gy += q[2] * w; gp += q[3] * w; gr += q[4] * w; } const calm = (1 - pr) * (1 - reach) * (1 - hk) * (1 - gTilt); gy = gy * calm + .05 * Math.sin(t * .73) + .03 * Math.sin(t * 1.31 + 2); gp = gp * calm + .025 * Math.sin(t * .91 + 1) - .03 * kRun; gr *= calm;
+    let gy = 0, gp = 0, gr = 0; if (!ride) for (const q of GL) { if (t < q[0] - .1 || t > q[1] + .5) continue; const w = smoother(q[0], q[0] + .45, t) * (1 - smoother(q[1] - .1, q[1] + .42, t)); gy += q[2] * w; gp += q[3] * w; gr += q[4] * w; } const calm = (1 - pr) * (1 - reach) * (1 - hk) * (1 - gTilt); gy = gy * calm + .05 * Math.sin(t * .73) + .03 * Math.sin(t * 1.31 + 2); gp = gp * calm + .025 * Math.sin(t * .91 + 1) - .03 * kRun; gr *= calm;
     if (look.k > .001 || look.w > 0) { look.k = ctx.reset ? look.w : damp(look.k, look.v ? look.w : 0, 6, dt); if (look.v) { group.updateMatrixWorld(true); _v.copy(look.v); head.getWorldPosition(_v2); _v.sub(_v2); const ya = st.yaw, lx = _v.x * Math.cos(ya) - _v.z * Math.sin(ya), lz = _v.x * Math.sin(ya) + _v.z * Math.cos(ya); const ty = clamp(Math.atan2(-lz, lx), -1.15, 1.15), tq = clamp(Math.atan2(_v.y, Math.hypot(lx, lz)) + .35, -.5, .6); look.y = ctx.reset ? ty : damp(look.y, ty, 7, dt); look.p = ctx.reset ? tq : damp(look.p, tq, 7, dt); } gy = lerp(gy, look.y, look.k * calm); gp = lerp(gp, look.p, look.k * calm); }
     const thr = .045 * Math.cos(TAU * (p - .12)) * A, hx = PW[6] + thr - .10 * Math.abs(gy) * .6 + HL.x - .05 * hA, hy = PW[7] + .5 * HL.y + .022 * Math.cos(TAU * (p + .1)) * A - .08 * hA + .012 * Math.sin(t * 1.9) - .03 * gSnap, hz = -.17 * Math.sin(gy) + HL.z, hyaw = gy + .26 * pr * Math.sin(t * .9) + .35 * pr + .05 * hShake, hpit = PW[8] + gp + .02 * Math.sin(TAU * (p - .3)) * A + .05 * hShake * .6 + .10 * gSnap + pr * .05 * Math.sin(t * 21) - .12 * hA, hrol = gr + HL.r * .3 + .04 * Math.sin(t * .57) + .35 * pr * Math.sin(t * .7 + 1) * .4 + .03 * gJoy;
     Mrel.copy(Mb).invert().multiply(Ms); Mrel.decompose(_lm, qr, _v3); qi.identity(); qr.copy(qi.slerp(qr, .78));
@@ -1103,16 +1317,16 @@ const Pelican = (() => {
     // ---- bill, pouch, eyes
     const open = clamp(.004 * breath + .95 * hOpen * (.86 + .14 * Math.sin(t * 62)) + .92 * gOpen + pr * (.06 + .06 * Math.sin(t * 26)) + .10 * kRun * kGnd + .03 * kFly), jawA = .62 * open + .02 * Math.max(0, gSnap); state.open = open; jaw.rotation.z = -jawA; P.jawMesh.morphTargetInfluences[0] = open;
     group.updateMatrixWorld(true); sim(ctx, dt, T, kFly); posePouch(open, jawA, PSt, { s: gPs, a: gPa * 1.15 }, t);
-    const bl = Math.max(blinkAt(t), gTilt * .85, .55 * sm(0, 1, pr) * (.5 + .5 * Math.sin(t * 1.7)), .9 * pulseBump(t)), wide = clamp(hk + reach * .6 + sm(T_OFF - .5, T_OFF, t) * (1 - sm(T_OFF + 1, T_OFF + 2, t)) + .4 * sm(T_TOUCH - .8, T_TOUCH - .3, t) * (1 - sm(T_TOUCH + .6, T_TOUCH + 1.4, t))); const tired = .10 * kFl + .05; UB.uBl.value.set(lerp(lerp(.80 - tired, 1.06, wide), -.30, bl), lerp(lerp(.78, .95, wide), .30, bl)); UB.uCat.value = lerp(.9, .30, Sky.S.night || 0); uNf.value = Sky.S.night || 0;
+    const bl = Math.max(blinkAt(t), gTilt * .85, .55 * sm(0, 1, pr) * (.5 + .5 * Math.sin(t * 1.7)), (ride ? 0 : .9 * pulseBump(t))), wide = clamp(hk + reach * .6 + (ride ? 0 : sm(T_OFF - .5, T_OFF, t) * (1 - sm(T_OFF + 1, T_OFF + 2, t)) + .4 * sm(T_TOUCH - .8, T_TOUCH - .3, t) * (1 - sm(T_TOUCH + .6, T_TOUCH + 1.4, t)))); const tired = .10 * kFl + .05; UB.uBl.value.set(lerp(lerp(.80 - tired, 1.06, wide), -.30, bl), lerp(lerp(.78, .95, wide), .30, bl)); UB.uCat.value = lerp(.9, .30, Sky.S.night || 0); uNf.value = Sky.S.night || 0;
     const ex = gaze(t) * .16 - gy * .25, ey = .10 * Math.sin(t * .77 + 3) * .5 + gp * .2; for (const [e, s] of [[eyeR, 1], [eyeL, -1]]) { _e.set(-ey, (-ex) * 1, 0, 'YXZ'); e.quaternion.copy(e.userData.q0).multiply(_q.setFromEuler(_e)); }
     // ---- wings
     const fW = clamp(Math.max(T.wing, 0) + .40 * hFl * kGnd + .055 * shuf * (1 - T.wing) + .02 * Math.max(0, bump)), curl = lerp(.0, .22, 1) + clamp(vfl * .052, -.42, .60) * (1 - kFl) + .10 * gl + .10 * kBrake, flex = clamp(-vf * .10, 0, 1) * T.wing * (1 - .6 * kBrake);
-    const w = { f: fW, fl: -fl * (1 - .5 * kBrake) + .25 * hFl * (1 - T.wing) + .06 * gl * Math.sin(t * 2.2), fh: -fh * (1 - .5 * kBrake) + .3 * hFl * (1 - T.wing), flex, tw: -.10 * clamp(vf * .16, -1, 1) * (1 - kBrake) + .10 * gl, dih: lerp(7, 24, kBrake) + 9 * hFl + 3 * Math.sin(t * 1.1) * gl, curl, splay: 5 * clamp(vf * .2, -1, 1) + 8 * gl + 16 * kBrake, swp: 14 * kBrake - 3 * clamp(vf * .15, -1, 1), sh: .02 * hShake * hFl, cup: kBrake, bob: .022 * Math.exp(-dStep * 7) * Math.sin(dStep * 30) * kGnd + .02 * bump, sag: .010 * s2 * A };
+    const w = { f: fW, fl: -fl * (1 - .5 * kBrake) + .25 * hFl * (1 - T.wing) + .06 * gl * Math.sin(t * 2.2), fh: -fh * (1 - .5 * kBrake) + .3 * hFl * (1 - T.wing), flex, tw: -.10 * clamp(vf * .16, -1, 1) * (1 - kBrake) + .10 * gl, dih: lerp(7, 24, kBrake) + 9 * hFl + 3 * Math.sin(t * 1.1) * gl, curl, splay: 5 * clamp(vf * .2, -1, 1) + 8 * gl + 16 * kBrake, swp: 14 * kBrake - 3 * clamp(vf * .15, -1, 1), sh: .02 * hShake * hFl, cup: kBrake, bob: .022 * Math.exp(-dStep * 7) * Math.sin(dStep * 30) * kGnd * gaitWeight + .02 * bump, sag: .010 * s2 * A };
     const jit = hShake * hFl; poseWing(1, Object.assign({}, w, { fl: w.fl + jit * .22 + .02 * Math.sin(t * 1.7) * gl, dih: w.dih + 40 * T.roll * .12 * kFly })); poseWing(-1, Object.assign({}, w, { fl: w.fl - jit * .16 + .02 * Math.sin(t * 1.9 + 1) * gl, fh: w.fh, f: clamp(w.f - .008 * Math.abs(shuf)), dih: w.dih - 40 * T.roll * .12 * kFly }));
-    for (let i = 0; i < 6; i++) bones[B_ARM + i].matrix.multiplyMatrices(Mb, ARM[i]); imC.castShadow = fW > .10; UF.uTr.value = sm(.15, .6, fW); legM.visible = t < T_TOUCH + 1.0;
+    for (let i = 0; i < 6; i++) bones[B_ARM + i].matrix.multiplyMatrices(Mb, ARM[i]); imC.castShadow = fW > .10; UF.uTr.value = sm(.15, .6, fW); legM.visible = ride || t < T_TOUCH + 1.0;
     poseTail(t, p, A, wag, kFly, kBrake, kFl, T, hFl); poseCrest(t);
     // ---- legs
-    for (let i = 0; i < 2; i++) leg(i, t, p, T, kFly, kSki, kFl, hHop);
+    for (let i = 0; i < 2; i++) leg(i, t, p, T, ride);
     group.updateMatrixWorld(true); imL.instanceMatrix.needsUpdate = imC.instanceMatrix.needsUpdate = true; imL.geometry.attributes.aF.needsUpdate = imC.geometry.attributes.aF.needsUpdate = true;
   }
   const gaze = t => { const k = Math.floor(t / .83), a = h1(k * 5.3) - .5, b = h1((k - 1) * 5.3) - .5; return lerp(b, a, sm(0, .07, t - k * .83)); };
@@ -1137,9 +1351,25 @@ const Pelican = (() => {
 
   // ---- legs ---------------------------------------------------------------------------------------------------------------------------------------------------
   const FA2 = { p: V3(), phi: 0, spr: 1, curl: 0, out: 0, down: false, c: 0 }, H = V3(), K = V3(), FJ = V3(), dL = V3(), pole = V3(), Xb = V3(), Yb = V3(), Zb = V3();
-  function leg(i, t, p, T, kFly, kSki, kFl, hop) {
-    const sd = i ? 1 : -1, o = FA2; const gp = t > T_OFF ? T_RUN / BEAT + (t - T_RUN) / (BEAT / 2) : p; gait(i, gp, T, o); const rel = i === 0 ? sm(T_OFF + .10, T_OFF + .75, t) : sm(T_OFF - .02, T_OFF + .55, t); const tuck = Math.max(rel, 0);
-    if (tuck > 0) { // trail under the tail, then skis, then paddles
+  function leg(i, t, p, T, ride) {
+    const sd = i ? 1 : -1, o = FA2;
+    let tuck = 0;
+    if (ride) {
+      rideGait(i, T, o);
+      const trailing = T.legs, paddling = T.float, paddle = T.t * (2.4 + T.speed * .7) + i * PI;
+      o.p.lerp(_v.set(-1.02, .80 + .05 * T.flapLag, sd * .17), trailing);
+      o.p.lerp(_v.set(.02 + .25 * Math.sin(paddle), -.48 + .075 * Math.cos(paddle), sd * .23), paddling);
+      o.phi = lerp(lerp(o.phi, 2.55, trailing), .7 + .55 * Math.cos(paddle), paddling);
+      o.spr = lerp(lerp(o.spr, .34, trailing), .75 + .27 * Math.cos(paddle), paddling);
+      o.curl = lerp(lerp(o.curl, .25, trailing), .1, paddling);
+      tuck = Math.max(trailing, paddling);
+      o.down = o.down && T.mode !== 'fly' && T.mode !== 'float';
+    } else {
+      const gp = t > T_OFF ? T_RUN / BEAT + (t - T_RUN) / (BEAT / 2) : p;
+      gait(i, gp, T, o);
+      tuck = i === 0 ? sm(T_OFF + .10, T_OFF + .75, t) : sm(T_OFF - .02, T_OFF + .55, t);
+    }
+    if (!ride && tuck > 0) { // trail under the tail, then skis, then paddles
       const fy = T.pos.y, wl = Path.WATER - fy; const trail = .045 * flapAt(t - .12); const tx = -1.02, ty = .80 + trail, tz = sd * .17, kS = sm(T_TOUCH - 1.35, T_TOUCH - .4, t), kP = sm(T_TOUCH + .30, T_TOUCH + .95, t), kH = sm(T_TOUCH + .38, T_TOUCH + .98, t), pad = t * 2.1 + (i ? PI : 0); const sx = .60 + .05 * sd, sy = Math.max(wl + .09, -.55) + .02 * Math.sin(t * 9 + i * 2) * sm(T_TOUCH, T_TOUCH + .1, t), sz = sd * .27, px = .02 + .24 * Math.sin(pad), py = -.50 + .06 * Math.cos(pad), pz = sd * .23;
       let X = lerp(lerp(tx, sx, kS), px, kP), Y = lerp(lerp(ty, sy, kS), py, kP), Z = lerp(lerp(tz, sz, kS), pz, kP); _v.set(.0, .98, sd * .12).applyMatrix4(Mb); X = lerp(X, _v.x, kH); Y = lerp(Y, _v.y, kH); Z = lerp(Z, _v.z, kH); o.p.set(lerp(o.p.x, X, tuck), lerp(Math.max(o.p.y, -.2), Y, tuck), lerp(o.p.z, Z, tuck)); o.phi = lerp(o.phi, lerp(lerp(2.55, -.50 - .06 * Math.sin(t * 13 + i), kS), .7 + .55 * Math.cos(pad), kP), tuck); o.spr = lerp(o.spr, lerp(lerp(.34, 1.12, kS), .75 + .35 * Math.cos(pad), kP), tuck); o.curl = lerp(o.curl, lerp(lerp(.25, -.12, kS), .1, kP), tuck); o.down = o.down && tuck < .02; }
     // joint from the ball of the foot: heel lifts about the ball
@@ -1159,13 +1389,14 @@ const Pelican = (() => {
   P.foot = (i, o) => out3(o).copy(foots[i].l).applyMatrix4(group.matrixWorld); P.footDown = i => foots[i].down;
   P.lookAt = (v, w = 1) => { look.v = v ? (look.vv = look.vv || V3()).copy(v) : null; look.w = v ? w : 0; };
   const pushEv = (L, e) => { L.push(e); if (L.length > 24) L.shift(); };
-  P.honk = t => pushEv(EV.honk, (t === undefined ? G.t : t) + .1); P.gulp = t => pushEv(EV.gulp, t); P.openBill = (a, b) => pushEv(EV.open, [a, b]);
+  P.honk = (t, ride = false) => pushEv(ride ? rideHonks : EV.honk, (t === undefined ? G.t : t) + .1); P.gulp = t => pushEv(EV.gulp, t); P.openBill = (a, b) => pushEv(EV.open, [a, b]);
+  P.resetRideActions = () => { rideHonks.length = 0; };
   P.bodyMatrix = Mb; P.bodyWorld = o => (o || new THREE.Matrix4()).copy(body.matrixWorld); P.seatPos = o => seat.getWorldPosition(out3(o));
   P.info = () => ({ long: P.nLong * 2 + tail.length + crest.length, cov: P.nCov * 2, body: P.bodyFeathers, head: P.headFeathers });
   const reg = { order: 20, build() {
     const tm = buildTorso(); buildPlumage(); buildWings(); skinM = buildSkin(); const hm = buildHead(), bm = buildBill(); legM = buildLegs(); reg.pick = [tm, hm, ...bm];
     const ctx0 = { t: 0, dt: 1 / 60, st: Path.bird(0), reset: true }; update(ctx0); sp3.init = false; group.traverse(o => o.layers.enable(1)); return group; },
-    update, poke(hit, ctx) { P.honk(ctx.t); } };
+    update, poke(hit, ctx) { P.honk(ctx.freeRide ? ctx.st.t : ctx.t, ctx.freeRide); } };
   Assets.add('pelican', reg);
   return P;
 })();
@@ -1205,7 +1436,7 @@ const Lamp = (() => {
 //   Rider.headObj          head group, origin at the atlas; eyes at local (0.12, 0.20, +-0.06), mouth (0.175, 0.07, 0)
 //   Rider.cup              teacup Object3D, +Y up, origin at the cup's foot (rim radius .085, height .151)      Rider.saucer
 //   Rider.teaPos(out)      world centre of the tea surface            Rider.teaR  its radius in metres
-//   Rider.sip(t)           he takes a live sip starting at film time t (2.4 s)
+//   Rider.sip(t, ride)     he takes a live sip starting at time t (2.4 s)
 //   Rider.lookAt(v|null,w) gaze override: world point, weight 0..1    Rider.drop(x01,z01,strength) poke the tea (0.5,0.5 = centre)
 //   Rider.S                read-only state {smile, lid, sip, toast, air}
 const Rider = (() => {
@@ -1539,7 +1770,7 @@ const Rider = (() => {
   const S = { t: 0, smile: 0, lid: 0, sip: 0, toast: 0, air: 0, init: false };
   class Spr { constructor() { this.x = V3(); this.v = V3(); } reset() { this.x.set(0, 0, 0); this.v.set(0, 0, 0); } step(a, w, z, h) { for (const k of ['x', 'y', 'z']) { this.v[k] += (-w * w * this.x[k] - 2 * z * w * this.v[k] - a[k]) * h; this.x[k] += this.v[k] * h; } } }
   const sChest = new Spr(), sHead = new Spr(), sCup = new Spr(), sHair = new Spr(), sTas = new Spr(), sSl = new Spr(); const pPos = V3(), pVel = V3(), acc = V3(), vel = V3(), wPos = V3(), wQ = new THREE.Quaternion(), wQi = new THREE.Quaternion(), wS = V3(), qLev = new THREE.Quaternion(), lUp = V3(), lF = V3(), lR = V3();
-  const cpPos = V3(), cpVel = V3(), cAcc = V3(), gL = V3(), airL = V3(), airW = V3(); airL.w = 0; let eyeY = 0, eyeP = 0, hdY = 0, hdP = 0, tPrev = 0, sips = [], lookV = null, lookW = 0, standIn = null, teaH = .1145, lastSipN = 0;
+  const cpPos = V3(), cpVel = V3(), cAcc = V3(), gL = V3(), airL = V3(), airW = V3(); airL.w = 0; const sips = [], rideSips = []; let eyeY = 0, eyeP = 0, hdY = 0, hdP = 0, tPrev = 0, phasePrev = 0, lookV = null, lookW = 0, standIn = null, teaH = .1145, lastSipN = 0;
   const soft = (v, l) => { const n = v.length(); return n < 1e-6 ? v : v.multiplyScalar(l * Math.tanh(n / l) / n); };
   const C_ = Score.CUE; const leanK = keyedCR([[0, .02], [C_.BUMP - .1, .02], [C_.BUMP + .25, .16], [C_.BUMP + 1.1, .02], [C_.HONK - .1, .02], [C_.HONK + .22, .20], [C_.HONK + 1.2, .03], [C_.RUN - .2, .02], [C_.RUN + .9, .13], [C_.OFF - .4, .10], [C_.OFF + .5, .30], [C_.OFF + 2.2, .22], [57, .10], [62, .06], [70, .08], [71.2, .16], [72.1, .12], [72.7, -.08], [73.6, .06], [76, .03], [81.6, .04]]);
   const smileK = keyedCR([[0, .28], [4.6, .3], [5.6, .75], [8, .4], [10, .7], [12, .35], [14.6, .6], [17, .35], [24, .35], [26.4, .9], [28.6, .8], [28.9, .1], [30.5, .55], [43, .5], [43.4, .15], [45, .7], [48, .4], [48.15, 0], [49.5, .5], [50.4, .45], [52.8, .55], [54.2, .95], [58, 1], [62, .8], [66.6, .95], [70, .7], [71.8, .3], [73.2, .85], [75, .6], [77.4, 1], [81.6, .9]]);
@@ -1547,9 +1778,9 @@ const Rider = (() => {
   const toastK = keyedCR([[56.7, 0], [57.55, 1], [58.7, 1], [59.7, 0]]), braceK = keyedCR([[70.9, 0], [71.75, 1], [72.8, 1], [74.0, 0]]), runK = keyedCR([[C_.RUN - .3, 0], [C_.RUN + .8, 1], [C_.OFF + 1.0, .8], [C_.OFF + 3, 0]]);
   // what he watches when nobody directs him: [from, to, weight, world point fn]
   const LOOKS = [[4.5, 7.4, .85, (s, o) => o.copy(wPos).addScaledVector(Sky.S.sunDir, 30)], [8.7, 11.8, 1, (s, o) => o.set(-17, 4.2, -8.5)], [13.6, 16.4, .95, (s, o) => o.set(s.pos.x - 2.6, .9, 2.4)], [18.2, 20.2, .8, (s, o) => o.set(s.pos.x - 1.5, 1.4, -5)], [21.2, 22.9, .7, (s, o) => o.set(s.pos.x - .6, .8, 6)], [28.2, 30.6, 1, (s, o) => o.set(-43.6, 1.2, -4.4)], [32, 34.2, .85, (s, o) => o.set(s.pos.x - 1.8, 1.4, -3.6)], [35.6, 38, .9, (s, o) => o.set(s.pos.x - 1.2, 1.5, -3.6)], [39.2, 42.4, .9, (s, o) => o.set(s.pos.x - 1.6, 1.6, -3.6)], [42.6, 45.4, 1, (s, o) => o.set(s.pos.x - 2.0, 2.5, s.pos.z)], [47.4, 49.8, .9, (s, o) => o.set(s.pos.x - 3, 1.2, s.pos.z - .5)], [60.4, 62.8, .8, (s, o) => o.set(-60, 6, -10)], [67.4, 70.4, .8, (s, o) => o.set(s.pos.x + 14, 9, s.pos.z + 16)]];
-  function gaze(t, st, out) { // level-frame yaw (+ = to his right), pitch (+ = up)
+  function gaze(t, st, out, ride) { // level-frame yaw (+ = to his right), pitch (+ = up)
     const seg = t / 2.35 + .3, n = Math.floor(seg), a = h1_(n * 1.3 + 2), b = h1_(n * 2.1 + 5); let y = (a - .5) * .95, p = (b - .5) * .26 - .02; if (h1_(n + 9) < .28) { y = .05; p = -.34; }            // now and then he checks the tea
-    let w = 0; for (const L of LOOKS) { const k = L[2] * sm(L[0], L[0] + .35, t) * (1 - sm(L[1] - .4, L[1], t)); if (k > .01) { L[3](st, tv); toYP(tv, tv2); y = lerp(y, tv2.x, k); p = lerp(p, tv2.y, k); w = Math.max(w, k); } }
+    let w = 0; if (!ride) for (const L of LOOKS) { const k = L[2] * sm(L[0], L[0] + .35, t) * (1 - sm(L[1] - .4, L[1], t)); if (k > .01) { L[3](st, tv); toYP(tv, tv2); y = lerp(y, tv2.x, k); p = lerp(p, tv2.y, k); w = Math.max(w, k); } }
     if (lookV && lookW > .01) { toYP(tv.copy(lookV), tv2); y = lerp(y, tv2.x, lookW); p = lerp(p, tv2.y, lookW); w = Math.max(w, lookW); } out.x = y; out.y = p; out.z = w; return out; }
   const eyeW = V3(); function toYP(v, o) { tv3.copy(v).sub(eyeW).applyQuaternion(wQi).applyQuaternion(tq2.copy(qLev).invert()); const h = Math.hypot(tv3.x, tv3.z); o.x = clamp(Math.atan2(tv3.z, tv3.x), -1.35, 1.35); o.y = clamp(Math.atan2(tv3.y, h), -.75, .8); return o; }
   // blinks: hashed slots, sometimes double
@@ -1566,12 +1797,12 @@ const Rider = (() => {
     standIn = new THREE.Group(); standIn.add(root); if (Main.STUDIO && !Q.has('nobarrel')) { const bd = Mat.mesh(Geo.warp(Geo.sphere(1, 56, 36), (x, y, z) => [x * 1.02 * (x < 0 ? 1.12 : 1) - .08, y * .575 - .585, z * .635]), Mat.make('feather', { color: '#f4efe4' })); standIn.add(bd); bd.layers.enable(1); } return standIn; }
 
   function update(ctx) {
-    const t = ctx.t, st = ctx.st; let dt = ctx.dt || 1 / 60; attach(); let reset = ctx.reset || !S.init; S.t = t;
+    const t = ctx.t, st = ctx.st, ride = ctx.freeRide; let dt = ctx.dt || 1 / 60; attach(); let reset = ctx.reset || !S.init; S.t = t;
     if (standIn && root.parent === standIn) { const f = st.phase; const wlk = st.mode === 'walk' || st.mode === 'run' ? 1 : 0; standIn.position.copy(st.pos); standIn.position.y += 1.78 + wlk * -.032 * Math.cos(TAU * f) - (st.mode === 'fly' ? .10 * st.flap : 0); standIn.rotation.set(st.roll + wlk * .035 * Math.cos(PI * f), st.yaw, st.pitch + wlk * .02 * Math.sin(TAU * f), 'YZX'); standIn.updateMatrixWorld(true); }
     root.updateWorldMatrix(true, false); root.matrixWorld.decompose(wPos, wQ, wS); wQi.copy(wQ).invert();
     if (pPos.distanceTo(wPos) > 4) reset = true; if (reset) { vel.copy(st.vel); pVel.copy(vel); acc.set(0, 0, 0); } else { vel.subVectors(wPos, pPos).divideScalar(dt); tv.subVectors(vel, pVel).divideScalar(dt); const k = 1 - Math.exp(-100 * dt); if (tv.length() > 45) tv.setLength(45); acc.lerp(tv, k); pVel.copy(vel); } pPos.copy(wPos);
     // ---- level frame
-    const air = S.air = sm(C_.OFF - .1, C_.OFF + 1.2, t) * (1 - sm(C_.TOUCH - .2, C_.TOUCH + 1.6, t)); tv.set(0, 1, 0).applyQuaternion(wQ); lUp.set(0, 1, 0).lerp(tv, .42 * air).normalize().applyQuaternion(wQi); lF.set(1, 0, 0).addScaledVector(lUp, -lUp.x).normalize(); lR.crossVectors(lF, lUp); tm.makeBasis(lF, lUp, lR); qLev.setFromRotationMatrix(tm);
+    const air = S.air = ride ? st.air : sm(C_.OFF - .1, C_.OFF + 1.2, t) * (1 - sm(C_.TOUCH - .2, C_.TOUCH + 1.6, t)); tv.set(0, 1, 0).applyQuaternion(wQ); lUp.set(0, 1, 0).lerp(tv, .42 * air).normalize().applyQuaternion(wQi); lF.set(1, 0, 0).addScaledVector(lUp, -lUp.x).normalize(); lR.crossVectors(lF, lUp); tm.makeBasis(lF, lUp, lR); qLev.setFromRotationMatrix(tm);
     // ---- air and gravity in seat space
     Wind.at(wPos.x, wPos.y + .6, wPos.z, airW); airW.multiplyScalar(1.6).sub(st.vel); const spd = airW.length(); if (spd > 15) airW.multiplyScalar(15 / spd); airL.copy(airW).applyQuaternion(wQi); airL.w = Math.min(15, spd) * (.35 + .65 * air); gL.set(0, -9.81, 0).sub(acc).applyQuaternion(wQi);
     // ---- springs (seat-relative, world axes)
@@ -1579,24 +1810,35 @@ const Rider = (() => {
     for (let i = 0; i < n; i++) { sChest.step(acc, TAU * 1.0, .36, h); sHead.step(acc, TAU * .80, .36, h); sCup.step(acc, TAU * .72, .36, h); tv.copy(acc).multiplyScalar(.55).addScaledVector(airW, -1.1 - 1.3 * air); sHair.step(tv, TAU * 2.3, .2, h); tv.copy(acc).multiplyScalar(.9).addScaledVector(airW, -.75); sTas.step(tv, TAU * 1.35, .16, h); }
     const cs = soft(tv.copy(sChest.x), .046), cy = cs.y; const cl = tv2.copy(cs).applyQuaternion(wQi).clone(), hs = soft(V3().copy(sHead.x), .062).applyQuaternion(wQi), us = soft(V3().copy(sCup.x), .075).applyQuaternion(wQi);
     // ---- drinking
-    let sipU = -1, k = 0; for (const at of Score.SIPS) if (t >= at - .3 && t < at + 3.2) { sipU = t - at; k = Math.max(k, Score.sipK(t, at)); } for (const at of sips) if (t >= at - .3 && t < at + 3.2 && k === 0 && sipU < 0) { sipU = t - at; k = Math.max(k, Score.sipK(t, at)); } S.sip = k; const u = sipU, drink = u < 0 ? 0 : sm(.45, .95, u) * (1 - sm(1.55, 1.95, u)), tilt = u < 0 ? 0 : (.50 * sm(.38, .80, u) + .20 * sm(.8, 1.55, u)) * (1 - sm(1.58, 2.10, u)), ahh = u < 0 ? 0 : sm(1.95, 2.2, u) * (1 - sm(2.6, 3.1, u)), tap = u < 0 ? 0 : ring(t, t - u + 2.36, 5.2, 8.5); const gulp = u > .9 && u < 1.75 ? Math.pow(Math.max(0, Math.sin((u - .9) / .85 * TAU)), 2) : 0;
-    const toast = S.toast = clamp(toastK(t)), brace = clamp(braceK(t)), run = clamp(runK(t)); const kick = ring(t, C_.HONK, 2.6, 4) + .8 * ring(t, C_.BUMP, 2.4, 4.5) + .7 * ring(t, C_.TOUCH, 1.7, 3) + .5 * ring(t, C_.GULP, 3, 5);
+    let sipU = -1, k = 0;
+    if (ride) {
+      const at = rideSips[rideSips.length - 1];
+      if (st.t >= at && st.t < at + 3.2) { sipU = st.t - at; k = Score.sipK(st.t, at); }
+    } else {
+      for (const at of Score.SIPS) if (t >= at - .3 && t < at + 3.2) { sipU = t - at; k = Math.max(k, Score.sipK(t, at)); }
+      for (const at of sips) if (t >= at - .3 && t < at + 3.2 && k === 0 && sipU < 0) { sipU = t - at; k = Math.max(k, Score.sipK(t, at)); }
+    }
+    S.sip = k;
+    const u = sipU, drink = u < 0 ? 0 : sm(.45, .95, u) * (1 - sm(1.55, 1.95, u)), tilt = u < 0 ? 0 : (.50 * sm(.38, .80, u) + .20 * sm(.8, 1.55, u)) * (1 - sm(1.58, 2.10, u)), ahh = u < 0 ? 0 : sm(1.95, 2.2, u) * (1 - sm(2.6, 3.1, u)), tap = u < 0 ? 0 : ring(t, t - u + 2.36, 5.2, 8.5); const gulp = u > .9 && u < 1.75 ? Math.pow(Math.max(0, Math.sin((u - .9) / .85 * TAU)), 2) : 0;
+    const toast = S.toast = ride ? 0 : clamp(toastK(t)), brace = ride ? 0 : clamp(braceK(t)), run = ride ? st.run : clamp(runK(t)); const kick = ride ? 0 : ring(t, C_.HONK, 2.6, 4) + .8 * ring(t, C_.BUMP, 2.4, 4.5) + .7 * ring(t, C_.TOUCH, 1.7, 3) + .5 * ring(t, C_.GULP, 3, 5);
     // ---- torso
-    const bt = Score.beat(t), br = Math.sin(t * 1.55) * .5 + .5, lev = Score.level(t), nod = Math.exp(-bt.f * 4.5) * (bt.i % 2 ? .6 : 1) * lev * (1 - air * .5) * (1 - k), sway = Math.sin(t / Score.BEAT * PI) * .022 * lev; let lean = leanK(t) + .012 * br - .05 * k * (1 - drink) + .05 * drink + kick * .10 - .05 * ahh + cl.x * -1.1; const rollX = sway + cl.z * 1.1 + .05 * toast, tw = .05 * Math.sin(t * .53) + hdY * .16 - .10 * toast;
+    const bt = ride ? { i: Math.floor(st.phase), f: fract(st.phase) } : Score.beat(t);
+    const br = Math.sin(t * 1.55) * .5 + .5, lev = ride ? st.gait : Score.level(t), nod = Math.exp(-bt.f * 4.5) * (bt.i % 2 ? .6 : 1) * lev * (1 - air * .5) * (1 - k), sway = Math.sin((ride ? st.phase : t / Score.BEAT) * PI) * .022 * lev; const lean = (ride ? .02 + .11 * run + air * (.07 + .24 * st.pitch) : leanK(t)) + .012 * br - .05 * k * (1 - drink) + .05 * drink + kick * .10 - .05 * ahh + cl.x * -1.1; const rollX = sway + cl.z * 1.1 + .05 * toast, tw = .05 * Math.sin(t * .53) + hdY * .16 - .10 * toast;
     tq.copy(ID).slerp(qLev, .72 - .3 * air); E.set(rollX, -tw, lean, 'YZX'); qC.setFromEuler(E).premultiply(tq); qB.copy(ID).slerp(qC, .5); tq.copy(ID).slerp(qC, .1); bones[0].quaternion.copy(tq); bones[0].position.set(0, .08 - Math.abs(kick) * .004, 0); tq2.copy(tq).invert().multiply(qB); bones[1].quaternion.copy(tq2); bones[1].position.set(0, .17 + cl.y * .4, 0); tq2.copy(qB).invert().multiply(qC); bones[2].quaternion.copy(tq2); bones[2].position.set(0, .18 + cl.y * .6 + .004 * br - .006 * ahh, 0);
     for (const b of bones) b.updateMatrix(); MP.copy(bones[0].matrix); MB.multiplyMatrices(MP, bones[1].matrix); MC.multiplyMatrices(MB, bones[2].matrix); tm.copy(MC); chO.setFromMatrixPosition(MC); MC.multiply(M1.makeTranslation(0, -.43, 0)); MCi.copy(MC).invert(); MB.multiply(M1.makeTranslation(0, -.25, 0)); MP.multiply(M1.makeTranslation(0, -.08, 0));        // now: rest-space -> posed
     // ---- head
-    eyeW.copy(HP).add(V3(.1, .2, 0)).applyMatrix4(MC).applyMatrix4(root.matrixWorld); gaze(t, st, gz); const lookCup = sm(0, .35, k) * (1 - drink); let gy = lerp(gz.x, .02, Math.max(lookCup, drink)), gp = lerp(gz.y, -.30, lookCup * (1 - k * .4)); gp = lerp(gp, .10, drink); gy = lerp(gy, -.15, toast * .8); gp = lerp(gp, .22, toast * .8);
+    eyeW.copy(HP).add(V3(.1, .2, 0)).applyMatrix4(MC).applyMatrix4(root.matrixWorld); gaze(t, st, gz, ride); const lookCup = sm(0, .35, k) * (1 - drink); let gy = lerp(gz.x, .02, Math.max(lookCup, drink)), gp = lerp(gz.y, -.30, lookCup * (1 - k * .4)); gp = lerp(gp, .10, drink); gy = lerp(gy, -.15, toast * .8); gp = lerp(gp, .22, toast * .8);
     if (reset) { eyeY = hdY = gy; eyeP = hdP = gp; } const sub = n; for (let i = 0; i < sub; i++) { hdY = damp(hdY, gy * .72, 3.6, h); hdP = damp(hdP, gp * .62, 4.2, h); eyeY = damp(eyeY, gy, 17, h); eyeP = damp(eyeP, gp, 17, h); }
     const hp = hdP + .13 * drink - .05 * lookCup * k - .030 * nod + .05 * ahh + kick * .10 + .03 * Math.sin(t * .9) * (1 - k), hr = .06 * Math.sin(t * .47 + 1) * (1 - k) - sway * .6 - hdY * .10 + .10 * toast; tq.copy(qC).slerp(qLev, .86); E.set(hr, -hdY, hp, 'YZX'); qH.setFromEuler(E).premultiply(tq); head.quaternion.copy(qH); head.position.copy(HP).applyMatrix4(MC).addScaledVector(hs, .85).addScaledVector(cl, -.85); head.position.addScaledVector(lUp, -.012 * Math.abs(kick) - .006 * nod - .008 * ahh + .010 * run); tv.copy(lF).multiplyScalar(.018 * k - .012 * drink); head.position.add(tv); head.updateMatrix();
     // ---- face
-    const smile = S.smile = clamp(smileK(t) + .5 * ahh + .25 * toast - .8 * drink, 0, 1.1), lidC = S.lid = clamp(Math.max(blink(t) * (1 - drink), sm(.55, 1, k) * (u < 1.75 ? 1 : 0) * 1.0, u > 1.6 ? 1 - sm(1.95, 2.5, u) : 0, .0)), brw = clamp(browK(t) + .55 * drink + .35 * ahh + .06 * nod, 0, 1.3); const ey = clamp(eyeY - hdY, -.62, .62), ep = clamp(eyeP - hp, -.5, .42);
+    const smile = S.smile = clamp((ride ? .42 : smileK(t)) + .5 * ahh + .25 * toast - .8 * drink, 0, 1.1), lidC = S.lid = clamp(Math.max(blink(t) * (1 - drink), sm(.55, 1, k) * (u < 1.75 ? 1 : 0) * 1.0, u > 1.6 ? 1 - sm(1.95, 2.5, u) : 0, .0)), brw = clamp((ride ? .22 : browK(t)) + .55 * drink + .35 * ahh + .06 * nod, 0, 1.3); const ey = clamp(eyeY - hdY, -.62, .62), ep = clamp(eyeP - hp, -.5, .42);
     for (let s = 0; s < 2; s++) { const sg = s ? -1 : 1; E.set(0, -ey - sg * .20 * .0, ep, 'YZX'); tq.setFromEuler(E); tv.set(EYE.x, EYE.y, EYE.z * sg); tm.compose(tv, tq, one); eyeI.setMatrixAt(s, tm); const yawL = -sg * .30; const open = .56 + .20 * brw + ep * .45 - .10 * smile, up = lerp(open, -.16, lidC), lo = lerp(-.50 + ep * .25 + .14 * smile, -.20, lidC * .9); E.set(sg * .06, yawL, up, 'YXZ'); tq.setFromEuler(E); tm.compose(tv, tq, one); lidU.setMatrixAt(s, tm); E.set(0, yawL, lo, 'YXZ'); tq.setFromEuler(E); tm.compose(tv, tq, one); lidL.setMatrixAt(s, tm); } eyeI.instanceMatrix.needsUpdate = lidU.instanceMatrix.needsUpdate = lidL.instanceMatrix.needsUpdate = true;
-    brow.rotation.z = .045 * (brw - .25) - .035 * lidC * (1 - drink) * .5; brow.position.y = .2 + .006 * (brw - .25); moust.rotation.z = -.03 * smile * .4 + .02 * gulp; moust.position.y = .0022 * smile + .0015 * drink - .0004; moust.scale.z = 1 + .035 * smile - .04 * drink; uMou.uSm.value = smile; uMou.uOpn.value = clamp(.75 * ahh + .9 * drink * .4 + .25 * sm(.8, 1.1, smile) + .6 * clamp(pulse(t, C_.HONK, .06, .25) + pulse(t, C_.BUMP, .06, .22))); uFace.uSmile.value = smile; uFace.uPuff.value = .7 * drink * (1 - .5 * gulp); uFace.uBl.value = ahh + .4 * air + .5 * drink; apple.position.y = -.022 + .020 * gulp; apple.position.x = .0335;
+    brow.rotation.z = .045 * (brw - .25) - .035 * lidC * (1 - drink) * .5; brow.position.y = .2 + .006 * (brw - .25); moust.rotation.z = -.03 * smile * .4 + .02 * gulp; moust.position.y = .0022 * smile + .0015 * drink - .0004; moust.scale.z = 1 + .035 * smile - .04 * drink; uMou.uSm.value = smile; uMou.uOpn.value = clamp(.75 * ahh + .9 * drink * .4 + .25 * sm(.8, 1.1, smile) + (ride ? 0 : .6 * clamp(pulse(t, C_.HONK, .06, .25) + pulse(t, C_.BUMP, .06, .22)))); uFace.uSmile.value = smile; uFace.uPuff.value = .7 * drink * (1 - .5 * gulp); uFace.uBl.value = ahh + .4 * air + .5 * drink; apple.position.y = -.022 + .020 * gulp; apple.position.x = .0335;
     tv.copy(sHair.x).multiplyScalar(.5); soft(tv, .052 + .045 * air); tq.copy(wQ).multiply(qH).invert(); tv.applyQuaternion(tq); uHair.uHs.value.copy(tv); uHair.uHf.value = Math.min(.012, .0010 + .00085 * spd);
     // ---- cup and saucer. hold = saucer place in the level frame, seen from the chest
     const inL = (x, y, z, o) => o.set(0, 0, 0).addScaledVector(lF, x).addScaledVector(lUp, y).addScaledVector(lR, z);
-    inL(.352, .035, .004, hold).add(chO).addScaledVector(us, 1).addScaledVector(cl, -1); inL(.0, .16 * brace + .05 * toast - .05 * k * .6 + .05 * run, -.03 * toast, tv); hold.add(tv); hold.addScaledVector(lUp, -.006 * tap); const rattle = run * .0022 * Math.sin(t * 61) * Math.exp(-((t - (Score.last('step', t) || { t: 0 }).t)) * 9);
+    inL(.352, .035, .004, hold).add(chO).addScaledVector(us, 1).addScaledVector(cl, -1); inL(.0, .16 * brace + .05 * toast - .05 * k * .6 + .05 * run, -.03 * toast, tv); hold.add(tv); hold.addScaledVector(lUp, -.006 * tap); const stepAge = ride ? bt.f * st.stepLength / Math.max(.1, st.speed) : t - (Score.last('step', t) || { t: 0 }).t;
+    const rattle = run * .0022 * Math.sin(t * 61) * Math.exp(-stepAge * 9);
     const yawC = lerp(lerp(-.72, -.30, k), -.55, toast); saucer.position.copy(hold); E.set(.03 * Math.sin(t * 1.1) + cl.z * .5 + tap * .06, 0, .03 * Math.sin(t * 1.37 + 1) - cl.x * .4 + tap * .05 + .05 * k, 'YZX'); saucer.quaternion.copy(qLev).multiply(tq.setFromEuler(E)); saucer.updateMatrix();
     tv.set(0, .0095, 0).applyMatrix4(saucer.matrix); const liftR = run * .035; tv.addScaledVector(lUp, liftR + rattle); // cup standing on the saucer
     tv2.set(.176, .0765, 0).applyMatrix4(head.matrix); const al = tilt; const Rr = .0845, Hc = .150; inL(Rr * Math.cos(al) + Hc * Math.sin(al), Rr * Math.sin(al) - Hc * Math.cos(al), 0, lips).add(tv2);
@@ -1605,7 +1847,7 @@ const Rider = (() => {
     // ---- arms
     const shrug = .012 * k + .030 * toast + .02 * Math.abs(kick); shR.set(-.004, .667 + shrug, .136).applyMatrix4(MC); shL.set(-.004, .667 + .4 * shrug, -.136).applyMatrix4(MC); wrR.copy(WR).applyMatrix4(cup.matrix); wrL.copy(WL).applyMatrix4(saucer.matrix); tv.set(-.30, -.75 + .45 * k + .45 * toast, .55 + .35 * k + .25 * toast); ik(shR, wrR, tv, elR, nR); tv.set(-.35, -.8, -.42); ik(shL, wrL, tv, elL, nL); poseLimb(LsR, shR, elR, wrR, nR.negate(), .34, 1); for (let i = 0; i < 2; i++) cuffBtn(2 + i, PA.L - .045 - i * .026, nR, .0500); poseLimb(LsL, shL, elL, wrL, nL.negate(), .34, 1); for (let i = 0; i < 2; i++) cuffBtn(4 + i, PA.L - .045 - i * .026, nL, .0500);
     // ---- legs
-    const gp2 = st.phase, walk = (1 - air) * (t < C_.OFF ? 1 : 0), sw = walk * .045 * Math.sin(PI * gp2), tapB = walk * Math.exp(-bt.f * 6) * .5; for (let s = 0; s < 2; s++) { const sg = s ? -1 : 1, L = s ? LlL : LlR, ph = s ? 1 : -1, fl = air * (.06 * Math.sin(t * 3.3 + s * 2) + .03 * Math.sin(t * 6.1 + s)); hipR.set(.018, .086, sg * .092).applyMatrix4(MP); knee.set(.325 - .03 * air + cl.x * .2, -.085 + .012 * sw * ph + .02 * air + .01 * Math.abs(kick), sg * .492); const shin = .05 + ph * sw * 1.2 - .035 * cl.x * 8 + air * -.55 + fl + (t > C_.TOUCH ? .25 * brace : .0) - .12 * kick * .3; ank.set(knee.x - .055 + .46 * Math.sin(shin), knee.y - .40 * Math.cos(shin * .8), sg * (.735 + .012 * Math.sin(t * 1.3 + s) + .04 * Math.abs(kick) + .03 * air)); tv.copy(knee).sub(hipR); tv2.copy(ank).sub(knee); legN.crossVectors(tv, tv2).normalize(); poseLimb(L, hipR, knee, ank, legN, .30, .8);
+    const gp2 = st.phase, walk = ride ? st.gait : (1 - air) * (t < C_.OFF ? 1 : 0), sw = walk * .045 * Math.sin(PI * gp2), tapB = walk * Math.exp(-bt.f * 6) * .5; for (let s = 0; s < 2; s++) { const sg = s ? -1 : 1, L = s ? LlL : LlR, ph = s ? 1 : -1, fl = air * (.06 * Math.sin(t * 3.3 + s * 2) + .03 * Math.sin(t * 6.1 + s)); hipR.set(.018, .086, sg * .092).applyMatrix4(MP); knee.set(.325 - .03 * air + cl.x * .2, -.085 + .012 * sw * ph + .02 * air + .01 * Math.abs(kick), sg * .492); const shin = .05 + ph * sw * 1.2 - .035 * cl.x * 8 + air * -.55 + fl + (t > C_.TOUCH ? .25 * brace : .0) - .12 * kick * .3; ank.set(knee.x - .055 + .46 * Math.sin(shin), knee.y - .40 * Math.cos(shin * .8), sg * (.735 + .012 * Math.sin(t * 1.3 + s) + .04 * Math.abs(kick) + .03 * air)); tv.copy(knee).sub(hipR); tv2.copy(ank).sub(knee); legN.crossVectors(tv, tv2).normalize(); poseLimb(L, hipR, knee, ank, legN, .30, .8);
       // shoe: toe forward, sole down, heel taps the beat
       const own = s === (bt.i & 1) ? 1 : 0, pitch = -.10 + .16 * tapB * own - .42 * air + fl * .8 + shin * .55 + .05 * Math.sin(t * 1.7 + s); E.set(sg * .16, -sg * (.22 + .06 * Math.sin(t * .8 + s)), pitch, 'YZX'); tq.setFromEuler(E); tm.compose(tv.copy(ank), tq, one); shoes.setMatrixAt(s, tm); } shoes.instanceMatrix.needsUpdate = true;
     // ---- buttons on the front
@@ -1615,7 +1857,7 @@ const Rider = (() => {
     const top = chO.clone().set(.088, .755, 0).applyMatrix4(MC); for (let i = 0; i < n; i++) { stepTails(h, gL, airL, pin); stepTie(h, gL, airL, top, MC, MCi, reset && i === 0); } drawTails(); drawTie(tv.set(0, 0, 1).transformDirection(MC).clone()); dynGeo.attributes.position.needsUpdate = dynGeo.attributes.normal.needsUpdate = true;
     tv.copy(sTas.x).multiplyScalar(.6); soft(tv, .10).applyQuaternion(wQi); uWool.uTs.value.copy(tv); uWool.uFold.value = 1 - (st.wing || 0); uWool.uTf.value = Math.min(.03, .003 + .0016 * spd);
     // ---- tea
-    updateTea(ctx, t, dt, reset, n, h, tilt, u, air); S.init = true; tPrev = t;
+    updateTea(ctx, t, dt, reset, n, h, tilt, u, air); S.init = true; tPrev = t; phasePrev = st.phase;
   }
   function cuffBtn(i, s, nn, r) { pathAt(s, _p, _t); _n.crossVectors(nn, _t).normalize(); const a = 2.35; tv.copy(_n).multiplyScalar(Math.cos(a)).addScaledVector(nn, Math.sin(a)).normalize(); tv2.copy(_t); tv3.crossVectors(tv2, tv); tm.makeBasis(tv2, tv, tv3); tm.scale(_c.set(.62, .62, .62)); tm.setPosition(_p.addScaledVector(tv, r + .001)); btn.setMatrixAt(i, tm); }
   const _cw = V3(), _cq = new THREE.Quaternion(), _m3 = new THREE.Matrix4(), dO = {};
@@ -1623,16 +1865,32 @@ const Rider = (() => {
     cup.updateWorldMatrix(false, false); cup.matrixWorld.decompose(_cw, _cq, tv); if (reset) { cpVel.copy(ctx.st.vel); cAcc.set(0, 0, 0); } else { tv.subVectors(_cw, cpPos).divideScalar(dt); tv2.subVectors(tv, cpVel).divideScalar(dt); if (tv2.length() > 30) tv2.setLength(30); cAcc.lerp(tv2, 1 - Math.exp(-30 * dt)); cpVel.copy(tv); } cpPos.copy(_cw);
     // slosh: the surface is a damped plane seeking the apparent horizon (world axes)
     const w0 = TAU * 2.3; if (reset) { h0.fill(0); h1.fill(0); lp0.fill(0); sSl.reset(); } for (let i = 0; i < n; i++) { const tx = clamp(-cAcc.x / 9.81, -.5, .5) * .55, tz = clamp(-cAcc.z / 9.81, -.5, .5) * .55; sSl.v.x += (-w0 * w0 * (sSl.x.x - tx) - 2 * .13 * w0 * sSl.v.x) * h; sSl.v.z += (-w0 * w0 * (sSl.x.z - tz) - 2 * .13 * w0 * sSl.v.z) * h; sSl.x.x += sSl.v.x * h; sSl.x.z += sSl.v.z * h; } const sx = .16 * Math.tanh(sSl.x.x / .16), sz = .16 * Math.tanh(sSl.x.z / .16);
-    tv.set(-sx, 1, -sz).normalize().applyQuaternion(tq.copy(_cq).invert()); const ny = Math.max(.35, tv.y); let gx = -tv.x / ny, gz_ = -tv.z / ny; let done = 0; for (const at of Score.SIPS) done += sm(at + .9, at + 1.6, t); for (const at of sips) done += .35 * sm(at + .9, at + 1.6, t); const H = .1165 - .0075 * Math.min(done, 5), m = Math.hypot(gx, gz_), Hc = Math.min(H, .1478 - m * .0825); uTea.uTS.value.set(gx, gz_); uTea.uTH.value = teaH = Math.max(.055, Hc); _m3.makeRotationFromQuaternion(_cq); uTea.uTR.value.setFromMatrix4(_m3);
+    tv.set(-sx, 1, -sz).normalize().applyQuaternion(tq.copy(_cq).invert()); const ny = Math.max(.35, tv.y); let gx = -tv.x / ny, gz_ = -tv.z / ny; let done = 0; if (!ctx.freeRide) for (const at of Score.SIPS) done += sm(at + .9, at + 1.6, t); for (const at of ctx.freeRide ? rideSips : sips) done += .35 * sm(at + .9, at + 1.6, ctx.freeRide ? ctx.st.t : t); const H = .1165 - .0075 * Math.min(done, 5), m = Math.hypot(gx, gz_), Hc = Math.min(H, .1478 - m * .0825); uTea.uTS.value.set(gx, gz_); uTea.uTH.value = teaH = Math.max(.055, Hc); _m3.makeRotationFromQuaternion(_cq); uTea.uTR.value.setFromMatrix4(_m3);
     tv.copy(Sky.S.sunDir).applyQuaternion(tq); const hz = Math.hypot(tv.x, tv.z) || 1; uTea.uSkA.value.copy(Sky.S.hor); uTea.uSkB.value.copy(Sky.S.mid).lerp(Sky.S.zen, .3); uTea.uSkS.value.copy(Sky.S.sun); uTea.uCauD.value.set(-tv.x / hz, -tv.z / hz, sm(.05, .35, hz) * sm(.05, .4, tv.y) * (1 - Sky.S.moon * .6));
     // notes, feet, drops -> impulses
-    if (!reset) { const w = Math.max(1e-4, t - tPrev), quiet = sm(23.8, 24.3, t) * (1 - sm(28.6, 29.2, t)); for (const e of Score.recent('koto', t, w)) { const r = e.r === undefined ? (e.m % 8) : e.r, a = r / 8 * TAU + .4, rd = .16 + .30 * ((r * 5) % 8) / 8; poke(Math.cos(a) * rd, Math.sin(a) * rd, (.0056 * quiet + .0014 * (1 - quiet) + (e.live ? .001 : 0)) * (.5 + e.v), quiet > .3 ? 3.1 : 2.6); } for (const e of Score.recent('step', t, w)) poke(0, 0, .0012 * (1 - .45 * quiet), 3.6); for (const D of DROPT) for (let i = 0; i < NDROP; i++) { dropAt(D, i, t, dO); if (dO.u >= dO.T && dO.u - w < dO.T) poke(dO.x / TEAR, dO.z / TEAR, .0011, 2.0); } }
+    if (!reset) {
+      const w = Math.max(1e-4, t - tPrev), quiet = ctx.freeRide ? 0 : sm(23.8, 24.3, t) * (1 - sm(28.6, 29.2, t));
+      for (const e of Score.recent('koto', t, w)) { const r = e.r === undefined ? (e.m % 8) : e.r, a = r / 8 * TAU + .4, rd = .16 + .30 * ((r * 5) % 8) / 8; poke(Math.cos(a) * rd, Math.sin(a) * rd, (.0056 * quiet + .0014 * (1 - quiet) + (e.live ? .001 : 0)) * (.5 + e.v), quiet > .3 ? 3.1 : 2.6); }
+      if (ctx.freeRide) {
+        if (Math.floor(ctx.st.phase) > Math.floor(phasePrev)) poke(0, 0, .0012, 3.6);
+      } else {
+        for (const e of Score.recent('step', t, w)) poke(0, 0, .0012 * (1 - .45 * quiet), 3.6);
+        for (const D of DROPT) for (let i = 0; i < NDROP; i++) { dropAt(D, i, t, dO); if (dO.u >= dO.T && dO.u - w < dO.T) poke(dO.x / TEAR, dO.z / TEAR, .0011, 2.0); }
+      }
+    }
     const ns = clamp(Math.round(dt * 180), 1, 8); for (let i = 0; i < ns; i++) waveStep(.115, .9955, .014); waveTex();
     // leaping drops
-    let di = 0; for (const D of DROPT) if (t > D[0] - .01 && t < D[0] + .6) for (let i = 0; i < NDROP && di < NDROP * 2; i++) { dropAt(D, i, t, dO); if (!dO.on) continue; const s = .5 + .55 * h1_(i * 9), st_ = 1 + .16 * Math.sin(t * 40 + i); tm.makeScale(s * (2 - st_), s * st_, s * (2 - st_)); tm.setPosition(dO.x, teaH + dO.y, dO.z); drops.setMatrixAt(di++, tm); } drops.count = di; drops.visible = di > 0; if (di) drops.instanceMatrix.needsUpdate = true;
+    let di = 0; if (!ctx.freeRide) for (const D of DROPT) if (t > D[0] - .01 && t < D[0] + .6) for (let i = 0; i < NDROP && di < NDROP * 2; i++) { dropAt(D, i, t, dO); if (!dO.on) continue; const s = .5 + .55 * h1_(i * 9), st_ = 1 + .16 * Math.sin(t * 40 + i); tm.makeScale(s * (2 - st_), s * st_, s * (2 - st_)); tm.setPosition(dO.x, teaH + dO.y, dO.z); drops.setMatrixAt(di++, tm); } drops.count = di; drops.visible = di > 0; if (di) drops.instanceMatrix.needsUpdate = true;
   }
-  const api = { group: root, headObj: head, cup, saucer, teaR: TEAR, S, pick: [], teaPos(o) { o = o || V3(); return o.set(0, teaH, 0).applyMatrix4(cup.matrixWorld); }, sip(t) { if (sips.length && t - sips[sips.length - 1] < 2.6) return; for (const a of Score.SIPS) if (Math.abs(t - a) < 2.8) return; sips.push(t); if (sips.length > 12) sips.shift(); }, lookAt(v, w = 1) { lookV = v ? (lookV || V3()).copy(v) : null; lookW = v ? w : 0; }, drop(x, z, s = 1) { poke((x - .5) * 2, (z - .5) * 2, .0022 * s, 2.8); } };
-  Assets.add('rider', { order: 30, build, update, get pick() { return api.pick; }, poke(hit, ctx) { if (hit && hit.object && hit.object.name === 'cupProxy') api.drop(.5, .5, 1.2); api.sip(ctx.t); } });
+  const api = { group: root, headObj: head, cup, saucer, teaR: TEAR, S, pick: [], teaPos(o) { o = o || V3(); return o.set(0, teaH, 0).applyMatrix4(cup.matrixWorld); }, sip(t, ride = false) {
+      const events = ride ? rideSips : sips;
+      if (events.length && t - events[events.length - 1] < 2.6) return false;
+      if (!ride && Score.SIPS.some(at => Math.abs(t - at) < 2.8)) return false;
+      events.push(t);
+      if (events.length > 12) events.shift();
+      return true;
+    }, resetRideActions() { rideSips.length = 0; }, lookAt(v, w = 1) { lookV = v ? (lookV || V3()).copy(v) : null; lookW = v ? w : 0; }, drop(x, z, s = 1) { poke((x - .5) * 2, (z - .5) * 2, .0022 * s, 2.8); } };
+  Assets.add('rider', { order: 30, build, update, get pick() { return api.pick; }, poke(hit, ctx) { if (hit && hit.object && hit.object.name === 'cupProxy') api.drop(.5, .5, 1.2); api.sip(ctx.freeRide ? ctx.st.t : ctx.t, ctx.freeRide); } });
   return api;
 })();
 
@@ -2924,10 +3182,29 @@ const Arch = (() => {
   function build() {
     materials(); T.roofL = null; templates(); T.roofL = tpl(Geo.lathe([[.175, 0], [.165, .015], [.07, .13], [.06, .16], [.075, .17], [.03, .21], [.012, .27], [0, .275]], 4)); ropeMat = Mat.make('cloth', { color: '#d9c08c', rough: .95 });
     pavement(); quay(); northRow(); southRow(); backTown(); westTerrace(); flush(); buildShutters(); buildBoats(); return group; }
-  const bp = { pos: V3(), vel: V3() };
+  const bp = { pos: V3(), vel: V3() }, footMarks = [], footPoint = V3();
+  let previousStep = 0;
+  function rideFootMarks(ctx) {
+    const st = ctx.st, step = Math.floor(st.phase);
+    if (ctx.reset) { footMarks.length = 0; previousStep = step; }
+    if (step > previousStep && st.speed > .35 && (st.mode === 'walk' || st.mode === 'run') && st.pos.x >= -74) {
+      Pelican.foot(step % 2, footPoint);
+      footMarks.unshift({ x: footPoint.x, z: footPoint.z, t: st.t, strength: .55 + .5 * st.run });
+      if (footMarks.length > U.uFt.value.length) footMarks.pop();
+    }
+    previousStep = step;
+    for (const [i, field] of U.uFt.value.entries()) {
+      const mark = footMarks[i];
+      if (mark && st.t - mark.t < 1.2) field.set(mark.x, mark.z, st.t - mark.t, mark.strength);
+      else field.w = 0;
+    }
+  }
   function update(ctx) { const t = ctx.t; // footfalls -> rings in the stones
-    const S = Score.recent('step', t, 1.2); for (let i = 0; i < 6; i++) { const f = U.uFt.value[i], e = S[i]; if (!e) { f.w = 0; continue; } const p = Path.bird(e.t, bp); f.set(p.pos.x, p.pos.z + (e.foot ? .28 : -.28), t - e.t, p.pos.y < .3 ? Math.min(1.15, e.v) : 0); }
-    const K = Score.recent('taiko', t, 1.3); for (let i = 0; i < 3; i++) { const f = U.uTk.value[i], e = K[i]; if (!e) { f.w = 0; continue; } const p = Path.bird(e.t, bp); f.set(p.pos.x, p.pos.z, t - e.t, p.pos.y < .3 ? e.v : 0); }
+    if (ctx.freeRide) rideFootMarks(ctx);
+    else { const S = Score.recent('step', t, 1.2); for (let i = 0; i < 6; i++) { const f = U.uFt.value[i], e = S[i]; if (!e) { f.w = 0; continue; } const p = Path.bird(e.t, bp); f.set(p.pos.x, p.pos.z + (e.foot ? .28 : -.28), t - e.t, p.pos.y < .3 ? Math.min(1.15, e.v) : 0); } }
+    const drums = Score.recent('taiko', t, 1.3);
+    const K = ctx.freeRide ? drums.filter(e => e.live) : drums;
+    for (let i = 0; i < 3; i++) { const f = U.uTk.value[i], e = K[i]; if (!e) { f.w = 0; continue; } const p = ctx.freeRide ? ctx.st : Path.bird(e.t, bp); f.set(p.pos.x, p.pos.z, t - e.t, p.pos.y < .3 && (!ctx.freeRide || p.mode === 'walk' || p.mode === 'run') ? e.v : 0); }
     const C = Score.sec(t) === 'C', nt = Sky.S.t; U.uWinT.value = nt; U.uNg.value = Sky.S.night * (1 - LU.uPrint.value); U.uWinP.value = C ? .84 + .30 * Score.env('bass', t, .45) + .10 * Score.env('wood', t, .18) : 1; U.uSg.value.set(LU.uWind.value.z, Score.env('wood', t, .5) * .5 + Score.env('taiko', t, .5) * .4);
     for (let i = 0; i < 4; i++) { const k = U.uPk.value[i]; if (k.x >= 0) { const u = t - k.z; k.y = u < 0 || u > 9 ? 0 : sm(0, .12, u) * (1 - sm(7, 9, u)) * 1.1; if (u > 9 || u < -1) k.x = -1; } }
     updateShutters(t); for (const b of boats) { const h = .035 * Math.sin(t * 1.25 + b.ph) + .02 * Math.sin(t * 2.1 + b.ph * 2.3), rl = .035 * Math.sin(t * 1.05 + b.ph * 1.7) + .015 * Math.sin(t * 2.4 + b.ph); b.m.position.set(b.x + .05 * Math.sin(t * .5 + b.ph), WY + .06 + h, b.z + .04 * Math.sin(t * .41 + b.ph * 2)); b.m.rotation.set(rl, b.ry + .02 * Math.sin(t * .37 + b.ph), .02 * Math.sin(t * 1.4 + b.ph), 'YXZ'); b.m.updateMatrix(); for (const r of b.ropes) { pA.set(r.lx, .60, 0).applyMatrix4(b.m.matrix); pB.set(r.rx, .34, 9.27); ropeTo(r, pA, pB); } } }
@@ -3400,7 +3677,9 @@ const Stalls = (() => {
 // ---- THE LEMON XYLOPHONE (bars 12-17): one lemon hops the tune along the crockery; every contact is a written note. Between contacts it is
 // in free fall (g = 9.81), so height and timing agree by themselves; after its last note it is thrown into the pelican's open bill ----------------
 const Lemons = (() => {
-  const g = 9.81, A = Score.tracks.lemon, A2 = Score.tracks.lemon2, OFF = -2.25, R = .105; let root, objs = [], hero, hero2, leaf, trail, trail2, rings, ringN = 0, spilled = false, lastT = -1, lit = []; const tmp = V3(), L = {};
+  const g = 9.81, A = Score.tracks.lemon, A2 = Score.tracks.lemon2, OFF = -2.25, R = .105;
+  const objs = [], lit = [], tmp = V3(), L = {};
+  let root, hero, hero2, leaf, trail, trail2, rings, spilled = false, rideMode = false, rideTime = 0;
   const yOf = m => clamp(.74 + (m - 66) * .047, .5, 1.72), zRow = i => -3.56 + .10 * Math.sin(i * 2.1);
   // contact list: {t, p (lemon centre), m, kind}
   function contacts(T, row) { return T.map((e, i) => { const x = Path.xAt(e.t) + OFF; return { t: e.t, d: e.d, m: e.m, i, p: V3(x, (row ? yOf(e.m) * .62 + .02 : yOf(e.m)) + R, row ? -3.13 + .05 * Math.sin(i * 1.7) : zRow(i)) }; }); }
@@ -3441,22 +3720,90 @@ const Lemons = (() => {
   const hue = m => new THREE.Color().setHSL(fract((m - 60) / 24 * .9 + .06), .75, .62), RC = []; for (let m = 40; m < 100; m++) RC[m] = hue(m);
   function ribbon(mesh, S, t, cam) { const n = mesh.userData.n, P = mesh.geometry.attributes.position.array, U = mesh.geometry.attributes.aU.array; let k = 0; const a = V3(), b = V3(), d = V3(), v = V3(), s = V3(); for (let i = 0; i < n; i++) { const u = i / (n - 1), tt = t - u * .95; let p = at(S, tt, a); if (!p) { if (tt < S[0].t0) a.copy(S[0].a); else { mesh.visible = false; return; } } const tb = Math.max(S[0].t0, tt - .012); at(S, tb, b) || b.copy(a); d.subVectors(a, b); if (d.lengthSq() < 1e-8) d.set(1, 0, 0); v.subVectors(a, cam.position); s.crossVectors(d, v).normalize().multiplyScalar(.042 * (1 - u * .55)); P[k * 3] = a.x + s.x; P[k * 3 + 1] = a.y + s.y; P[k * 3 + 2] = a.z + s.z; U[k * 2] = u; U[k * 2 + 1] = 1; k++; P[k * 3] = a.x - s.x; P[k * 3 + 1] = a.y - s.y; P[k * 3 + 2] = a.z - s.z; U[k * 2] = u; U[k * 2 + 1] = -1; k++; } mesh.geometry.attributes.position.needsUpdate = mesh.geometry.attributes.aU.needsUpdate = true; mesh.visible = true; }
   function spill() { const x = -46.4, r = rng(99); for (let i = 0; i < 34; i++) Phys.add({ x: x + 1.55 - r() * 2.3, y: 1.15 + r() * .45, z: -4.05 - r() * .3, vx: -2.0 + r() * 2.6, vy: 1.9 + r() * 2.6, vz: .9 + r() * 2.3, r: .078 + r() * .02 }); if (typeof Stalls !== 'undefined' && Stalls.bump) Stalls.bump(Score.CUE.BUMP); }
-  function update(ctx) {
-    const t = ctx.t, B = Score.CUE.BUMP; root.visible = t > 20 && t < 60; if (ctx.reset) { spilled = t > B + .1; if (spilled && t < B + 14) { spill(); } } if (!spilled && t >= B && t < B + 2) { spilled = true; spill(); } if (t < B - .5) spilled = false;
+  function ring(p, m, t, s) {
+    if (lit.length === 48) lit.shift();
+    lit.push({ p: p.clone(), m, t, s });
+  }
+
+  function playCrockery(q, ctx, velocity) {
+    const e = Score.live('lemon', { t: ctx.t, m: q.m, v: velocity });
+    const hitTime = rideMode ? rideTime + e.t - ctx.t : e.t;
+    if (rideMode) q.rideHit = hitTime;
+    else q.hit = hitTime;
+    const p = q.o.position;
+    ring(V3(p.x, q.by + q.o.userData.top + R, p.z), q.m, hitTime, 1);
+  }
+
+  function strikeCrockery(ctx) {
+    if (Math.abs(ctx.st.pos.x - C1[1].p.x) >= 43) return;
+    for (const b of Phys.bodies) {
+      if (!b.live || b.held || b.float || b.v.y >= -.45 || b.p.x > -43 || b.p.x < -67 || b.p.z > -2.7 || b.p.z < -4.2) continue;
+      const depth = Math.max(-b.v.y * ctx.dt, .025);
+      for (const q of objs) {
+        const { x, z } = q.o.position;
+        const top = q.by + q.o.userData.top + b.r;
+        const dy = b.p.y - top;
+        if (dy > 0 || dy < -depth || Math.hypot(b.p.x - x, b.p.z - z) > q.w / 2 + b.r) continue;
+        const velocity = clamp(-b.v.y / 7, .35, .95);
+        b.p.y = top + .004;
+        b.v.y *= -.54;
+        b.v.x *= .74;
+        b.v.z *= .74;
+        playCrockery(q, ctx, velocity);
+        break;
+      }
+    }
+  }
+
+  function updateChase(ctx) {
+    const t = ctx.t, B = Score.CUE.BUMP;
+    if (ctx.reset) { spilled = t > B + .1; if (spilled && t < B + 14) spill(); }
+    if (!spilled && t >= B && t < B + 2) { spilled = true; spill(); }
+    if (t < B - .5) spilled = false;
     if (!root.visible) return;
     if (typeof Pelican !== 'undefined' && Pelican.mouth && t > Score.CUE.GULP - .9 && t < Score.CUE.GULP) { Pelican.mouth(tmp); const st = ctx.st, st2 = Path.bird(Score.CUE.GULP); L.mouthP = (L.mouthP || V3()).set(tmp.x + st2.pos.x - st.pos.x, tmp.y, tmp.z + st2.pos.z - st.pos.z); }
     end1.p.copy(mouthAt());
     const spin = (o, S, t, r) => { const p = at(S, t, pos); o.visible = !!p && t >= B; if (!p) return; o.position.copy(p); const k = S.findIndex(s => t < s.t1), s = S[Math.max(0, k)], dt = t - s.t0; o.rotation.set(0, (k * 1.9) % 6.28, dt * (5 + (k % 3) * 2.5) * (k % 2 ? 1 : -1) + k * 1.3); const q = Math.exp(-dt * 26) * .28 * (k > 0 ? 1 : 0) + (s.t1 - t < .03 && !s.gulp ? .12 * (1 - (s.t1 - t) / .03) : 0); o.scale.set(r * (1 + q * .5), r * (1 - q), r * (1 + q * .5)); };
-    spin(hero, S1, t, R); spin(hero2, S2, t, R * .92); if (hero.visible) ribbon(trail, S1, t, ctx.cam); else trail.visible = false; if (hero2.visible) ribbon(trail2, S2, t, ctx.cam); else trail2.visible = false;
+    spin(hero, S1, t, R); spin(hero2, S2, t, R * .92);
+    trail.visible = hero.visible;
+    trail2.visible = hero2.visible;
+    if (trail.visible) ribbon(trail, S1, t, ctx.cam);
+    if (trail2.visible) ribbon(trail2, S2, t, ctx.cam);
+  }
+
+  function update(ctx) {
+    if (rideMode !== !!ctx.freeRide) { rideMode = !!ctx.freeRide; lit.length = 0; }
+    root.visible = rideMode || (ctx.t > 20 && ctx.t < 60);
+    if (rideMode) {
+      rideTime += ctx.dt;
+      hero.visible = hero2.visible = trail.visible = trail2.visible = false;
+      strikeCrockery(ctx);
+    } else updateChase(ctx);
+    if (!root.visible) return;
+    const t = rideMode ? rideTime : ctx.t;
     // contact: the thing dips, rocks on its post and rings
-    for (const o of objs) { const far = Math.abs(o.o.position.x - ctx.st.pos.x); o.o.children[0].castShadow = far < 8; o.o.visible = far < 26; const dt = t - o.c.t, lv = o.hit === undefined ? 1e9 : t - o.hit, u = Math.min(dt >= 0 ? dt : 1e9, lv >= 0 ? lv : 1e9); if (u > 3) { o.o.position.y = o.by; o.o.rotation.set(0, o.ry, 0); continue; } const dip = -.028 * Math.exp(-u * 9) * Math.cos(u * 34), k = Math.exp(-u * 2.6) * .10; o.o.position.y = o.by + dip; o.o.rotation.set(Math.sin(u * 15) * k, o.ry, Math.cos(u * 13) * k * .8 * (u > .02 ? 1 : 0)); }
+    for (const o of objs) { const far = Math.abs(o.o.position.x - ctx.st.pos.x); o.o.children[0].castShadow = far < 8; o.o.visible = far < 26; const dt = rideMode ? Infinity : t - o.c.t, lv = t - (rideMode ? o.rideHit : o.hit), u = Math.min(dt >= 0 ? dt : Infinity, lv >= 0 ? lv : Infinity); if (u > 3) { o.o.position.y = o.by; o.o.rotation.set(0, o.ry, 0); continue; } const dip = -.028 * Math.exp(-u * 9) * Math.cos(u * 34), k = Math.exp(-u * 2.6) * .10; o.o.position.y = o.by + dip; o.o.rotation.set(Math.sin(u * 15) * k, o.ry, Math.cos(u * 13) * k * .8 * (u > .02 ? 1 : 0)); }
     // rings
-    let k = 0; const P = rings.geometry.attributes.aP, C = rings.geometry.attributes.aC; const put = (p, u, m, s) => { if (k >= 48) return; const c = RC[clamp(m | 0, 40, 99)]; P.setXYZW(k, p.x, p.y - R, p.z, .06 + (1 - Math.exp(-u * 5)) * .44 * s); C.setXYZW(k, c.r, c.g, c.b, Math.exp(-u * 5.5) * 1.3); k++; }; for (const C_ of [C1, C2]) for (const c of C_) { const u = t - c.t; if (u >= 0 && u < .8) put(c.p, u, c.m, 1); } for (const r of lit) { const u = t - r.t; if (u >= 0 && u < .8) put(r.p, u, r.m, r.s || 1); } while (lit.length && t - lit[0].t > 1) lit.shift(); rings.geometry.instanceCount = k; P.needsUpdate = C.needsUpdate = true; rings.visible = k > 0;
+    let k = 0;
+    const P = rings.geometry.attributes.aP, C = rings.geometry.attributes.aC;
+    const put = (p, u, m, s) => {
+      if (k >= 48 || u < 0 || u >= .8) return;
+      const c = RC[clamp(m | 0, 40, 99)];
+      P.setXYZW(k, p.x, p.y - R, p.z, .06 + (1 - Math.exp(-u * 5.5)) * .44 * s);
+      C.setXYZW(k++, c.r, c.g, c.b, Math.exp(-u * 5.5) * 1.3);
+    };
+    if (!rideMode) for (const contacts of [C1, C2]) for (const c of contacts) put(c.p, t - c.t, c.m, 1);
+    for (const r of lit) put(r.p, t - r.t, r.m, r.s || 1);
+    while (lit.length && t - lit[0].t > 1) lit.shift();
+    rings.geometry.instanceCount = k; P.needsUpdate = C.needsUpdate = true; rings.visible = k > 0;
   }
   // a loose lemon striking the crockery plays it too
-  Phys.on((kind, b, s, n) => { if (kind !== 'wood' && kind !== 'stone' && kind !== 'cloth') return; if (b.p.x < -66.5 || b.p.x > -43.5 || b.p.z > -2.8) return; let best = null, bd = .3; for (const o of objs) { const d = Math.hypot(b.p.x - o.o.position.x, b.p.z - o.o.position.z); if (d < bd) { bd = d; best = o; } } if (best) best.hit = G.t; });
-  Object.assign(L, { pos: (t, out) => at(S1, t, out), C1, C2, ring: (p, m, t, s) => lit.push({ p: p.clone(), m, t, s }), get objs() { return objs; } });
-  Assets.add('lemons', { order: 57, build, update, get pick() { return objs.map(o => o.o); }, poke(hit, ctx) { let o = hit.object; while (o && !objs.some(q => q.o === o)) o = o.parent; const q = objs.find(z => z.o === o); if (!q) return; const e = Score.live('lemon', { t: ctx.t, m: q.m, v: .9 }); q.hit = e.t; lit.push({ p: V3(q.o.position.x, q.o.position.y + q.o.userData.top + R, q.o.position.z), m: q.m, t: e.t }); return null; } });
+  Phys.on((kind, b) => { if (rideMode || (kind !== 'wood' && kind !== 'stone' && kind !== 'cloth')) return; if (b.p.x < -66.5 || b.p.x > -43.5 || b.p.z > -2.8) return; let best = null, bd = .3; for (const o of objs) { const d = Math.hypot(b.p.x - o.o.position.x, b.p.z - o.o.position.z); if (d < bd) { bd = d; best = o; } } if (best) best.hit = G.t; });
+  Object.assign(L, { pos: (t, out) => at(S1, t, out), C1, C2, ring: (p, m, t, s) => ring(p, m, rideMode ? rideTime : t, s), get objs() { return objs; } });
+  Assets.add('lemons', { order: 57, build, update,
+    get pick() { return root?.visible ? objs.filter(q => q.o.visible).map(q => q.o) : []; },
+    poke(hit, ctx) { let o = hit.object; while (o && !objs.some(q => q.o === o)) o = o.parent; const q = objs.find(item => item.o === o); if (q) playCrockery(q, ctx, .9); return null; },
+  });
   return L;
 })();
 
@@ -3877,7 +4224,7 @@ const Water = (() => {
   const MI = 14, impA = Array.from({ length: MI }, () => new THREE.Vector4()), impB = Array.from({ length: MI }, () => new THREE.Vector4()); let simA, simB, mSim, simClear = true; const steps = [], pend = []; const win = { x: -92, z: 0, px: -92, pz: 0 };
   let acc = 0, quiet = 999; const uWin = { value: new THREE.Vector4(-92, 0, SIZE, 0) };
   const impulse = (x, z, r, s, foam = 0, ringR = 0) => { pend.push([x, z, Math.max(r, .16), s, foam, ringR]); quiet = 0; };
-  function simUpdate(ctx) { const st = ctx.st, tx = Math.round(Math.min(st.pos.x, -82) / DX) * DX, tz = Math.round(clamp(st.pos.z, -60, 30) / DX) * DX; if (ctx.reset) { steps.length = 0; simClear = true; acc = 0; pend.length = 0; quiet = 999; win.x = tx; win.z = tz; }
+  function simUpdate(ctx) { const st = ctx.st, liveWater = ctx.freeRide && st.mode === 'float', tx = Math.round((liveWater ? st.pos.x : Math.min(st.pos.x, -82)) / DX) * DX, tz = Math.round(clamp(st.pos.z, liveWater ? -88 : -60, 30) / DX) * DX; if (ctx.reset) { steps.length = 0; simClear = true; acc = 0; pend.length = 0; quiet = 999; win.x = tx; win.z = tz; }
     acc = Math.min(acc + ctx.dt, .1); while (acc > STEP - 1e-5) { acc -= STEP; quiet += STEP; const sx = tx - win.x, sz = tz - win.z; win.x = tx; win.z = tz; if (quiet < 16) steps.push({ sx, sz, x: tx, z: tz, imp: pend.splice(0, MI) }); else if (sx || sz) steps.push({ sx, sz, x: tx, z: tz, imp: [] }); if (steps.length > 120) steps.shift(); } }
   function simRun() { if (simClear) { const c = R.getRenderTarget(); for (const s of [simA, simB]) { R.setRenderTarget(s); R.setClearColor(0, 0); R.clear(); } R.setRenderTarget(c); simClear = false; }
     const u = mSim.uniforms; for (const s of steps) { u.uShift.value.set(s.sx / SIZE, s.sz / SIZE); u.uC.value.set(s.x, s.z); u.uN.value = s.imp.length; s.imp.forEach((q, i) => { impA[i].set(q[0], q[1], q[2], q[3]); impB[i].set(q[4], q[5], 0, 0); }); u.tP.value = simA.texture; pass(mSim, simB); const t = simA; simA = simB; simB = t; } steps.length = 0; uWin.value.set(win.x, win.z, SIZE, quiet < 16 ? 1 : 0); }
@@ -3997,7 +4344,29 @@ const Water = (() => {
   function splash(x, z, r = .4, s = .5, foam = s * .5) { if (!isWater(x, z)) return; if (Math.abs(x - win.x) < SIZE * .48 && Math.abs(z - win.z) < SIZE * .48) impulse(x, z, r, -s, foam); else ring(x, z, .03 + .05 * s); if (s > .25 && dA) throwDrops(x, z, r, s, now); }
 
   // ---- what the score does to the water between t-dt and t ---------------------------------------------------------------------------------------------
-  let lastT = -1; const inStep = (a, t0, t1) => a > t0 && a <= t1;
+  let lastT = -1, rideContact = 0, rideWakeAt = 0, rideActive = false; const inStep = (a, t0, t1) => a > t0 && a <= t1;
+  function rideWater(ctx) {
+    const st = ctx.st, { x, z } = st.pos;
+    if (!rideActive || st.touchdown < rideContact || st.t + 1 < rideWakeAt) {
+      rideContact = st.touchdown;
+      rideWakeAt = st.t;
+    }
+    rideActive = true;
+    if (st.touchdown > rideContact) {
+      rideContact = st.touchdown;
+      if (st.touchdownWet) {
+        splash(x, z, .86, 1.3, .75);
+        ring(x, z, .11, ctx.t);
+      }
+    }
+    if (st.mode === 'float' && st.speed > .25 && st.t >= rideWakeAt) {
+      const strength = clamp(st.speed / 4.6);
+      const tailX = x - Math.cos(st.yaw) * .82, tailZ = z + Math.sin(st.yaw) * .82;
+      ring(x, z, .028 + .044 * strength, ctx.t);
+      impulse(tailX, tailZ, .41, -.50 * strength, .16 * strength);
+      rideWakeAt = st.t + .28;
+    }
+  }
   function scripted(ctx) { const t = ctx.t, t0 = ctx.reset ? t - 1e-6 : t - ctx.dt, st = ctx.st; if (t < 50 || t - t0 > .2) return;
     if (inStep(TOUCH, t0, t)) { const F = feet(TOUCH); impulse(F.s.pos.x, F.s.pos.z, 1.0, -4.2, .9); impulse(F.s.pos.x - .6, F.s.pos.z + .1, .55, -2.4, .8); }
     if (t > TOUCH && t < TOUCH + 4.2) { const F = feet(t), sp = F.s.speed, k = clamp(sp / 9); if (t < TOUCH + 2.9) for (const s of [-1, 1]) { const p = F.at(s, -.6); impulse(p.x, p.z, .26, -2.1 * k, .13 * k); } const hull = sm(TOUCH + .5, TOUCH + 1.4, t), b = F.at(0, -1.0), w = F.at(0, .9); if (sp > .25) { impulse(b.x, b.z, .42, .55 * k * hull * 1.6, .03 * k); impulse(w.x, w.z, .5, -.5 * k * hull, .05 * k); } }
@@ -4027,7 +4396,7 @@ const Water = (() => {
     surf = new THREE.Mesh(surfGeo(), surfMat()); surf.frustumCulled = false; surf.renderOrder = -20; surf.name = 'water'; bedM = bed(); buildSpray(); [drops, sheets, mist].forEach(o => o.layers.enable(1));
     const pg = Geo.merge([Geo.at(Geo.plane(B.x1 - B.x0, 1), 0, 0, 0)].slice(0, 0).concat([Geo.at(Geo.plane(-73.6 - B.x0, B.z1 - B.z0), (B.x0 - 73.6) / 2, WL, (B.z0 + B.z1) / 2, -PI / 2), Geo.at(Geo.plane(B.x1 + 73.6, -46 - B.z0), (B.x1 - 73.6) / 2, WL, (B.z0 - 46) / 2, -PI / 2), Geo.at(Geo.plane(104, 6), -22, WL, 12.5, -PI / 2)])); pickM = new THREE.Mesh(pg, new THREE.MeshBasicMaterial()); pickM.material.visible = false; W.pick = [pickM];
     const g = [surf, bedM, drops, sheets, mist, pickM]; if (Q.has('wtest')) g.push(wtest()); if (typeof Phys !== 'undefined' && Phys.on) Phys.on((k, b, s) => { if (k === 'water') splash(b.p.x, b.p.z, .28, clamp((s || 2) / 6, .3, 1), .2); }); return g; }
-  function update(ctx) { T = now = ctx.t; if (ctx.reset) { bellAt.clear(); liveR.length = 0; } simUpdate(ctx); scripted(ctx); const gold = Sky.S.night; U.uGold.value = gold * 1.1 * sm(54, 62, ctx.t); U.uFoamL.value.set(.10, .055, .022).multiplyScalar(gold); U.uBreeze.value = breeze(ctx.t) * (1 + .12 * Score.env('strings', ctx.t, 1.2)); const st = ctx.st; U.uBird.value.set(st.pos.x, st.pos.z, sm(TOUCH, TOUCH + 1, ctx.t)); const sp = ctx.t > TOUCH - .1 && ctx.t < TOUCH + 6.5; sheets.visible = mist.visible = sp; lastT = ctx.t; }
+  function update(ctx) { T = now = ctx.t; if (ctx.reset) { bellAt.clear(); liveR.length = 0; } simUpdate(ctx); if (ctx.freeRide) rideWater(ctx); else { rideActive = false; scripted(ctx); } const gold = Sky.S.night; U.uGold.value = gold * 1.1 * sm(54, 62, ctx.t); U.uFoamL.value.set(.10, .055, .022).multiplyScalar(gold); U.uBreeze.value = breeze(ctx.t) * (1 + .12 * Score.env('strings', ctx.t, 1.2)); const st = ctx.st; U.uBird.value.set(st.pos.x, st.pos.z, ctx.freeRide ? st.float : sm(TOUCH, TOUCH + 1, ctx.t)); const sp = !ctx.freeRide && ctx.t > TOUCH - .1 && ctx.t < TOUCH + 6.5; sheets.visible = mist.visible = sp; lastT = ctx.t; }
   function prepass(rd, scene, cam, ctx) { R = rd; const old = R.getRenderTarget(), ac = R.autoClear, vis = bedM.visible; R.autoClear = false; if (!baked) { baked = true; bake(scene); } U.uC.value.set(cam.position.x, cam.position.z); bedM.visible = LU.uPrint.value < .995; ringsUpdate(ctx, cam); waveStep(Q.has('tod') && Q.has('t') ? ctx.t : ctx.t); simRun(); U.tSim.value = simA.texture; reflect(scene, cam); R.setRenderTarget(old); R.autoClear = ac; }
   const W = Assets.add('water', { order: 70, build, update, prepass, pick: [], poke(hit, ctx) { const p = hit.point; const cm = ctx.cam.position; if (!isWater(p.x, p.z) || hit.distance > 110 || (p.z < -44 && p.x > -72 && cm.z > -40 && cm.y < 6)) return false; ring(p.x, p.z, .05, ctx.t); splash(p.x, p.z, .25, .7, .2); Score.live('bell', { t: ctx.t, m: Score.quant(84, ctx.t), v: .5 }); return true; } });
 
@@ -4124,6 +4493,47 @@ const Air = (() => {
 
   // ==================================================== SKY LANTERNS ====================================================================================
   const NL = 516, NEAR = 60, L = []; let lnN, lnF, glw, gP, gC; const LC = ['#fff0d2', '#ffe9c0', '#ffdcae', '#ffd3b0', '#ffe3a0', '#f9c4a4', '#fff4e0'];
+  const rideLanterns = [], MAX_RIDE_LANTERNS = 48, lanternRandom = rng(1917);
+  let rideLanternTime = 0;
+
+  function releaseLanterns(ctx, count = 1) {
+    if (!lnN || !ctx?.freeRide || !ctx.st || !Number.isFinite(count)) return 0;
+    const released = clamp(Math.floor(count), 0, Math.min(16, MAX_RIDE_LANTERNS - rideLanterns.length));
+    const { pos, vel, yaw, mode } = ctx.st;
+    const fx = Math.cos(yaw), fz = -Math.sin(yaw), rx = Math.sin(yaw), rz = Math.cos(yaw);
+    const air = mode === 'fly';
+    for (let i = 0; i < released; i++) {
+      const row = i % 3;
+      const ahead = (air ? 4.2 : 2.6) + (released > 1 ? row * 1.8 : 0);
+      const side = released === 1 ? 1.05 : (i - (released - 1) / 2) * .74;
+      const x = pos.x + fx * ahead + rx * side;
+      const y = pos.y + 2.0 + .18 * row;
+      const z = pos.z + fz * ahead + rz * side;
+      const wind = Wind.at(x, y, z, v3);
+      rideLanterns.push({
+        x, y, z, t0: rideLanternTime + i * .095, life: 26 + lanternRandom() * 6,
+        v: 1.24 + .36 * lanternRandom(), ta: 1, s: .86 + .24 * lanternRandom(),
+        dx: wind.x * .42 + rx * side * .09, dz: wind.z * .42 + rz * side * .09,
+        vx: vel.x * (air ? .86 : .36), vz: vel.z * (air ? .86 : .36),
+        ph: lanternRandom() * TAU, sd: lanternRandom(), col: hex(LC[i % LC.length]), p: V3(),
+        g: 0, on: false,
+      });
+    }
+    return released;
+  }
+
+  function clearRideLanterns() {
+    rideLanterns.length = 0;
+    rideLanternTime = 0;
+  }
+
+  function advanceRideLanterns(dt) {
+    rideLanternTime += dt;
+    for (let i = rideLanterns.length - 1; i >= 0; i--) {
+      const q = rideLanterns[i];
+      if (rideLanternTime - q.t0 >= q.life) rideLanterns.splice(i, 1);
+    }
+  }
   // the lens, tabulated from the shot list (falls back to the two last set-ups when the film is not loaded)
   const lensTable = () => { const o = [], fm = typeof Film !== 'undefined' && Film.SHOTS && Film.V ? Film : null; for (let t = 53; t < 81.6; t += .12) { const b = Path.posAt(t); let c; if (fm) { let sh = fm.SHOTS[fm.SHOTS.length - 1]; for (const k of fm.SHOTS) if (t < k[1]) { sh = k; break; } sh[2](t); c = fm.V.p.clone(); } else if (t < 69.6) continue; else if (t < 74.4) { const u = smoother(71.9, 74.6, t); c = V3(lerp(-99.2, -106.5, u), lerp(-.28, .55, u), lerp(-21.2, -18.6, u)); } else c = V3(b[0] - .5, .9, b[2] + 9.6); o.push({ t, c, b: V3(b[0], b[1] + 1.5, b[2]) }); } return o; };
   let LT = null; const seg = V3(), rel_ = V3(); function lensClear(q) { const p = lp; for (const e of LT) { if (e.t < q.t0 - 5) continue; lanternPos(q, e.t, p); rel_.subVectors(p, e.c); const d2 = rel_.lengthSq(), near = e.t > 73.6 ? 4.4 : 2.7; if (d2 < near * near) return false; seg.subVectors(e.b, e.c); const L2 = seg.lengthSq(), u = clamp(rel_.dot(seg) / L2); rel_.addScaledVector(seg, -u); const tube = e.t > 69.5 && e.t < 73.7 ? 2.9 : e.t >= 73.7 ? 1.9 : 1.25; if (rel_.lengthSq() < tube * tube) return false; } return true; }
@@ -4150,14 +4560,50 @@ const Air = (() => {
       fragmentShader: /* glsl */`varying vec2 vQ; varying vec4 vC; uniform float uTime, uPrint; uniform sampler2D tNz; void main(){ float r = length(vQ), a; vec3 c = vC.rgb; if (vC.a > 0.5) { float y = vQ.y * 0.5 + 0.5; float sd = vC.a - 1.0; float n = texture2D(tNz, vec2(vQ.x * 0.1 + sd * 7.0, y * 0.18 - uTime * 0.7 + sd * 3.0)).r - 0.5; float x = vQ.x + n * y * 1.6; float w = 0.62 * sqrt(max(y, 0.0)) * (1.0 - y) * 2.2 + 0.02; a = (1.0 - smoothstep(w * 0.25, w, abs(x))) * smoothstep(0.0, 0.1, y); c = mix(c, c * vec3(0.4, 0.6, 1.6), smoothstep(0.22, 0.0, y)); } else { a = max(1.0 - r, 0.0); a = a * a * a * 0.8 + a * 0.06; } gl_FragColor = vec4(c * a * (1.0 - uPrint), 1.0); }` })); glw.frustumCulled = false; glw.renderOrder = 8; l1(glw); g.push(glw); }
   // how bright each lantern is right now: base flicker, then the koto runs through the cloud in bands of height, bells flare a few
   let kEv = [], bEv = []; const kotoK = (q, t, bx, by, bz) => { let s = 0; if (kEv.length) { const d = Math.sqrt((q.p.x - bx) ** 2 + (q.p.y - by) ** 2 + (q.p.z - bz) ** 2), h = fract((q.p.y + 40) / 12 + q.sd * .06) * 8; for (const e of kEv) { const u = t - e.t - d / 95; if (u < 0 || u > 1.4) continue; let dr = Math.abs(h - (e.r + .5)); if (dr > 4) dr = 8 - dr; s += e.v * Math.exp(-dr * dr * .85) * sm(0, .035, u) * Math.exp(-u / .26); } } for (const e of bEv) { if (h1(q.sd * 97 + e.i * 3.7) < .07) { const u = t - e.t - q.sd * .35; if (u > 0) s += 2.4 * e.v * sm(0, .06, u) * Math.exp(-u / .9); } } return s; };
-  function updLanterns(t, st) { kEv = t > 52 ? Score.recent('koto', t, 1.9).filter(e => e.r !== undefined) : []; bEv = t > 52 ? Score.recent('bell', t, 4.5) : []; const b = st.pos, amp = lerp(1.0, .62, sm(72, 76, t)); wA.set(0, 0, 0); wB.set(0, 0, 0); let sA = 0, sB = 0, gA = 0, gB = 0; const rx = Math.sin(st.yaw), rz = Math.cos(st.yaw); for (const q of L) { const u = t - q.t0; q.on = u > (q.hold ? -3.4 : q.late ? -5 : -1.2); if (!q.on) { q.g = 0; continue; } lanternPos(q, t, q.p); q.open = q.hold ? sm(-3.4, -2.3, u) : q.late ? sm(-5, -3.8, u) : sm(-1.2, -.3, u); const lit = q.hold ? sm(-2.4, -.6, u) : q.late ? sm(-4.7, -2.4, u) * .85 + .15 * sm(0, 1, u) : sm(-.6, .8, u); q.mu = kotoK(q, t, b.x, b.y, b.z) * amp; q.g = lit * (.84 + q.mu * 2.3) * (.92 + .08 * Math.sin(t * 2.3 + q.ph)); const dx = q.p.x - b.x, dy = q.p.y - b.y - 1.4, dz = q.p.z - b.z, d2 = dx * dx + dy * dy + dz * dz; if (d2 < 900) { const w = q.g / ((1 + d2 * .12) * (1 + d2 * .12)); if (dx * rx + dz * rz > 0) { sA += w; gA += q.g / (2.5 + d2); wA.x += q.p.x * w; wA.y += q.p.y * w; wA.z += q.p.z * w; } else { sB += w; gB += q.g / (2.5 + d2); wB.x += q.p.x * w; wB.y += q.p.y * w; wB.z += q.p.z * w; } } }
+  function updLanterns(ctx) {
+    const { t, st, freeRide } = ctx;
+    if (freeRide) advanceRideLanterns(ctx.dt);
+    const visibleLanterns = freeRide ? rideLanterns : L;
+    const motionTime = freeRide ? rideLanternTime : t;
+    kEv = freeRide || t > 52 ? Score.recent('koto', t, 1.9).filter(e => e.r !== undefined) : [];
+    bEv = freeRide || t > 52 ? Score.recent('bell', t, 4.5) : [];
+    const b = st.pos, amp = freeRide ? .65 : lerp(1.0, .62, sm(72, 76, t));
+    wA.set(0, 0, 0); wB.set(0, 0, 0);
+    let sA = 0, sB = 0, gA = 0, gB = 0;
+    const rx = Math.sin(st.yaw), rz = Math.cos(st.yaw);
+    for (const q of visibleLanterns) {
+      const u = motionTime - q.t0;
+      q.on = u > (freeRide ? 0 : q.hold ? -3.4 : q.late ? -5 : -1.2);
+      if (!q.on) { q.g = 0; continue; }
+      let lit;
+      if (freeRide) {
+        pos0(q, motionTime, q.p);
+        const carried = 2.4 * (1 - Math.exp(-u / 2.4));
+        q.p.x += q.vx * carried;
+        q.p.z += q.vz * carried;
+        q.open = sm(0, .85, u);
+        lit = 1.75 * sm(.08, .6, u) * (1 - sm(q.life - 2, q.life, u));
+      } else {
+        lanternPos(q, t, q.p);
+        q.open = q.hold ? sm(-3.4, -2.3, u) : q.late ? sm(-5, -3.8, u) : sm(-1.2, -.3, u);
+        lit = q.hold ? sm(-2.4, -.6, u) : q.late ? sm(-4.7, -2.4, u) * .85 + .15 * sm(0, 1, u) : sm(-.6, .8, u);
+      }
+      q.mu = kotoK(q, t, b.x, b.y, b.z) * amp;
+      q.g = lit * (.84 + q.mu * 2.3) * (.92 + .08 * Math.sin(motionTime * 2.3 + q.ph));
+      const dx = q.p.x - b.x, dy = q.p.y - b.y - 1.4, dz = q.p.z - b.z, d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 >= 900) continue;
+      const w = q.g / ((1 + d2 * .12) * (1 + d2 * .12));
+      if (dx * rx + dz * rz > 0) { sA += w; gA += q.g / (2.5 + d2); wA.x += q.p.x * w; wA.y += q.p.y * w; wA.z += q.p.z * w; }
+      else { sB += w; gB += q.g / (2.5 + d2); wB.x += q.p.x * w; wB.y += q.p.y * w; wB.z += q.p.z * w; }
+    }
     // two pooled lights on the bird: weighted middle of what hangs on each side
-    const set = (l, w, s, g) => { if (s > 1e-5) { v3.set(w.x / s - b.x, w.y / s - b.y - 1.4, w.z / s - b.z); const d = v3.length() || 1, k = Math.min(d, 4.6) / d; l.position.set(b.x + v3.x * k, Math.max(WL + .6, b.y + 1.4 + v3.y * k), b.z + v3.z * k); } l.intensity = 11.5 * (1 - Math.exp(-g * 5)) * sm(53, 56.5, t) * (1 - LU.uPrint.value); }; set(plA, wA, sA, gA); set(plB, wB, sB, gB);
-    for (const h of lanH) { const q = L[h.k]; h.g = q.on ? q.g * .9 * (1 - sm(5, 11, q.p.y)) : 0; if (h.g > .004) Lan.pos(h.id, q.p.x, q.p.y + .1, q.p.z); } }
+    const set = (l, w, s, g) => { if (s > 1e-5) { v3.set(w.x / s - b.x, w.y / s - b.y - 1.4, w.z / s - b.z); const d = v3.length() || 1, k = Math.min(d, 4.6) / d; l.position.set(b.x + v3.x * k, Math.max(WL + .6, b.y + 1.4 + v3.y * k), b.z + v3.z * k); } l.intensity = 11.5 * (1 - Math.exp(-g * 5)) * (freeRide ? 1 : sm(53, 56.5, t)) * (1 - LU.uPrint.value); }; set(plA, wA, sA, gA); set(plB, wB, sB, gB);
+    for (const h of lanH) { const q = L[h.k]; h.g = !freeRide && q.on ? q.g * .9 * (1 - sm(5, 11, q.p.y)) : 0; if (h.g > .004) Lan.pos(h.id, q.p.x, q.p.y + .1, q.p.z); }
+  }
   const wA = V3(), wB = V3(), plA = new THREE.PointLight(new THREE.Color(1, .62, .30), 0, 26, 2), plB = new THREE.PointLight(new THREE.Color(1, .62, .30), 0, 26, 2), lanH = [];
-  const ord = []; function drawLanterns(cam, t) { const cx = cam.position.x, cy = cam.position.y, cz = cam.position.z; ord.length = 0; for (const q of L) if (q.on) { q.d = Math.sqrt((q.p.x - cx) ** 2 + (q.p.y - cy) ** 2 + (q.p.z - cz) ** 2); if (q.d < 24) ord.push(q); } if (ord.length > NEAR) { ord.sort((a, b) => a.d - b.d); ord.length = NEAR; } for (const q of ord) q.near = t; let n = 0, f = 0, k = 0; const put = (m, i, q) => { const u = Math.max(t - q.t0, 0), w = sm(0, 5, u), rx = .13 * w * Math.sin(u * .9 + q.ph), rz = .13 * w * Math.sin(u * .77 + q.ph * 2) + (q.hold ? 0 : 0); ee.set(rx, q.ph + u * .12 * (q.sd - .5), rz); qq.setFromEuler(ee); m4.compose(q.p, qq, vs.set(q.s, q.s, q.s)); m4.toArray(m.instanceMatrix.array, i * 16); m.userData.iL.setXYZW(i, q.g, q.sd, q.mu || 0, q.open); const c = m.instanceColor.array; c[i * 3] = q.col.r; c[i * 3 + 1] = q.col.g; c[i * 3 + 2] = q.col.b; };
-    for (const q of L) { if (!q.on) continue; if (q.near === t) { put(lnN, n++, q); gP.setXYZW(k, q.p.x, q.p.y + .13 * q.s, q.p.z, .135 * q.s * Math.min(1, q.g)); gC.setXYZW(k++, 4.6 * Math.min(1.6, q.g), 2.7 * Math.min(1.6, q.g), .95, 1 + q.sd * .9); } else put(lnF, f++, q); if (q.g > .01) { gP.setXYZW(k, q.p.x, q.p.y + .42 * q.s, q.p.z, 1.5 * q.s); const hg = q.g + 1.6 * q.mu; gC.setXYZW(k++, .150 * hg, .068 * hg, .020 * hg, 0); } }
-    lnN.count = n; lnF.count = f; for (const m of [lnN, lnF]) { m.instanceMatrix.needsUpdate = m.instanceColor.needsUpdate = m.userData.iL.needsUpdate = true; m.visible = m.count > 0; } k = fireflies(t, k); glw.geometry.instanceCount = k; glw.visible = k > 0; gP.needsUpdate = gC.needsUpdate = true; }
+  const ord = []; function drawLanterns(cam, ctx) { const { x: cx, y: cy, z: cz } = cam.position, items = ctx.freeRide ? rideLanterns : L, t = ctx.freeRide ? rideLanternTime : ctx.t; ord.length = 0; for (const q of items) if (q.on) { q.near = false; q.d = Math.hypot(q.p.x - cx, q.p.y - cy, q.p.z - cz); if (q.d < 24) ord.push(q); } if (ord.length > NEAR) { ord.sort((a, b) => a.d - b.d); ord.length = NEAR; } for (const q of ord) q.near = true; let n = 0, f = 0, k = 0; const put = (m, i, q) => { const u = Math.max(t - q.t0, 0), w = sm(0, 5, u), rx = .13 * w * Math.sin(u * .9 + q.ph), rz = .13 * w * Math.sin(u * .77 + q.ph * 2); ee.set(rx, q.ph + u * .12 * (q.sd - .5), rz); qq.setFromEuler(ee); m4.compose(q.p, qq, vs.set(q.s, q.s, q.s)); m4.toArray(m.instanceMatrix.array, i * 16); m.userData.iL.setXYZW(i, q.g, q.sd, q.mu || 0, q.open); const c = m.instanceColor.array; c[i * 3] = q.col.r; c[i * 3 + 1] = q.col.g; c[i * 3 + 2] = q.col.b; };
+    for (const q of items) { if (!q.on) continue; if (q.near) { put(lnN, n++, q); gP.setXYZW(k, q.p.x, q.p.y + .13 * q.s, q.p.z, .135 * q.s * Math.min(1, q.g)); gC.setXYZW(k++, 4.6 * Math.min(1.6, q.g), 2.7 * Math.min(1.6, q.g), .95, 1 + q.sd * .9); } else put(lnF, f++, q); if (q.g > .01) { gP.setXYZW(k, q.p.x, q.p.y + .42 * q.s, q.p.z, 1.5 * q.s); const hg = q.g + 1.6 * q.mu; gC.setXYZW(k++, .150 * hg, .068 * hg, .020 * hg, 0); } }
+    lnN.count = n; lnF.count = f; for (const m of [lnN, lnF]) { m.instanceMatrix.needsUpdate = m.instanceColor.needsUpdate = m.userData.iL.needsUpdate = true; m.visible = m.count > 0; } if (!ctx.freeRide) k = fireflies(ctx.t, k); glw.geometry.instanceCount = k; glw.visible = k > 0; gP.needsUpdate = gC.needsUpdate = true; }
   // ==================================================== FIREFLIES ======================================================================================
   const FF = (() => { const r = rng(515), o = []; for (let i = 0; i < 110; i++) { const s = i < 48; const a = r() * TAU, d = 3.5 + 13 * Math.sqrt(r()); o.push(s ? { x: -113 + Math.cos(a) * d, z: -27 + Math.sin(a) * d, y: WL + .25 + 1.6 * r() * r() } : { x: -75.5 - 6 * r(), z: -44 + 40 * r(), y: WL + .4 + 1.8 * r() }); Object.assign(o[i], { p: r() * TAU, q: r() * TAU, w: .5 + .8 * r(), h: r() }); } return o; })();
   function fireflies(t, k) { const on = sm(71.5, 75.5, t); if (on < .01) return k; const fl = Score.sing(t).a; for (const f of FF) { const pl = Math.pow(Math.max(0, Math.sin(t * f.w * 1.7 + f.p)), 3) * (.55 + .7 * fl) * on; if (pl < .02) continue; gP.setXYZW(k, f.x + .9 * Math.sin(t * .6 * f.w + f.q) + .3 * Math.sin(t * 1.7 + f.p), f.y + .3 * Math.sin(t * .9 * f.w + f.p), f.z + .9 * Math.cos(t * .5 * f.w + f.p), .085); gC.setXYZW(k++, 2.2 * pl, 3.0 * pl, .55 * pl, 0); } return k; }
@@ -4214,11 +4660,12 @@ const Air = (() => {
 
   // ==================================================== module =================================================================================================
   function build(ctx) { const g = []; buildBalloons(g); buildLanterns(g); buildClouds(g); buildFlock(g); for (let i = 0; i < 38; i++) { const h = { k: i, g: 0 }; h.id = Lan.add({ x: L[i].x, y: L[i].y, z: L[i].z, r: 4.6, color: [1, .58, .24], gain: () => h.g }); if (h.id >= 0) lanH.push(h); } for (const l of [plA, plB]) { l.layers.enable(1); g.push(l); } A.pick = pickB; return g; }
-  function update(ctx) { const t = now = ctx.t; if (ctx.reset) liveB.length = 0; updBalloons(t); updLanterns(t, ctx.st); updFlock(t); }
-  function prepass(R, scene, cam, ctx) { drawRigs(cam); drawLanterns(cam, ctx.t); drawClouds(cam, ctx.t, ctx); }
+  function update(ctx) { const t = now = ctx.t; if (ctx.reset) liveB.length = 0; updBalloons(t); updLanterns(ctx); updFlock(t); }
+  function prepass(R, scene, cam, ctx) { drawRigs(cam); drawLanterns(cam, ctx); drawClouds(cam, ctx.t, ctx); }
   const A = Assets.add('air', { order: 66, build, update, prepass, pick: [], poke(hit, ctx) { const i = hit.object.userData.i; if (i === undefined) return false; liveB.push({ i, t: ctx.t }); if (liveB.length > 24) liveB.shift(); Score.live('chord', { t: ctx.t, d: BAR, m: Score.chordAt(ctx.t).root, v: .6, notes: Score.chordAt(ctx.t).notes }); return true; } });
   const balloons = BD.map((b, i) => ({ R: b.R, pos: (o, t = now) => balloonPos(i, t, o || V3()), burn: (t = now) => burn(i, t) }));
-  return { balloons, lanterns: L, cranePos: (i, t, o) => cranePos(FL[i], t, o || V3()), lanternPos };
+  return { balloons, lanterns: L, cranePos: (i, t, o) => cranePos(FL[i], t, o || V3()), lanternPos,
+    releaseLanterns, clearRideLanterns, get rideLanternCount() { return rideLanterns.length; } };
 })();
 
 // ===== 80_post.js =====
@@ -4448,7 +4895,7 @@ function synth(P) {
 }
 
 const Sound = (() => {
-  const S = { ready: false, ctx: null, on: false, muted: false }, SR = 44100, TAIL = 3; let data = null, mBuf, fBuf, bank = {}, gM, gF, gL, comp, startAt = 0, srcs = [], waiters = [];
+  const S = { ready: false, ctx: null, on: false, muted: false }, SR = 44100, TAIL = 3; let data = null, mBuf, fBuf, bank = {}, gM, gF, gL, comp, startAt = 0, srcs = [], waiters = [], musicOnly = false;
   function params() { const ev = typeof Beasts !== 'undefined' && Beasts.events ? (() => { try { return Beasts.events(0, Score.DUR).map(e => { const b = Path.bird(clamp(e.t, 0, Score.DUR)), p = e.pos, dx = p ? (p.isVector3 ? p.x : p[0]) - b.pos.x : 0, dz = p ? (p.isVector3 ? p.z : p[2]) - b.pos.z : 0, dy = b.pos.y, d = Math.hypot(dx, dz, dy); return { t: e.t, k: e.k, g: 1 / (1 + (d / 11) * (d / 11)), pan: e.t < 52 ? clamp(.5 + dx / 22, .12, .88) : .5 }; }); } catch (e) { return []; } })() : [{ t: 7.2, k: 'bleat' }, { t: 15.0, k: 'thump' }, { t: 19.0, k: 'bleat' }, { t: 10.6, k: 'giraffe' }, { t: 31.4, k: 'bleat' }, { t: 48.6, k: 'trumpet' }, { t: 50.5, k: 'yip' }, { t: 52.9, k: 'trumpet' }]; return { SR, DUR: Score.DUR, TAIL, tr: JSON.parse(JSON.stringify(Score.tracks)), CUE: Score.CUE, ev }; }
   // synthesise off the main thread when the host allows workers, on it when not
   S.prepare = () => new Promise(res => { const P = params(), done = d => { data = d; S.ready = true; waiters.forEach(f => f()); res(d); }; let w = null; const main = () => setTimeout(() => done(synth(P)), 30);
@@ -4458,8 +4905,8 @@ const Sound = (() => {
   function load() { if (mBuf || !data || !S.ctx) return; mBuf = mk(data.music[0], data.music[1]); fBuf = mk(data.fx[0], data.fx[1]); for (const k in data.bank) bank[k] = mk(data.bank[k]); data.music = data.fx = null; }
   S.open = () => { if (S.ctx) return S.ctx; const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; S.ctx = new AC({ latencyHint: 'interactive' }); graph(); return S.ctx; };
   // play from film time t; loops are chained so the tail of one ride rings into the next
-  S.play = t => { if (!S.ctx || !S.ready) return false; load(); S.stop(); const now = S.ctx.currentTime + .06; startAt = now - t; sched(now, t); S.on = true; return true; };
-  function sched(when, off) { for (const [b, g] of [[mBuf, gM], [fBuf, gF]]) { const s = S.ctx.createBufferSource(); s.buffer = b; s.connect(g); s.start(when, off); s.onended = () => { const i = srcs.indexOf(s); if (i >= 0) srcs.splice(i, 1); }; srcs.push(s); } S.nextAt = when + Score.DUR - off; }
+  S.play = (t, onlyMusic = false) => { if (!S.ctx || !S.ready) return false; load(); S.stop(); musicOnly = onlyMusic; const now = S.ctx.currentTime + .06; startAt = now - t; sched(now, t); S.on = true; return true; };
+  function sched(when, off) { const stems = musicOnly ? [[mBuf, gM]] : [[mBuf, gM], [fBuf, gF]]; for (const [b, g] of stems) { const s = S.ctx.createBufferSource(); s.buffer = b; s.connect(g); s.start(when, off); s.onended = () => { const i = srcs.indexOf(s); if (i >= 0) srcs.splice(i, 1); }; srcs.push(s); } S.nextAt = when + Score.DUR - off; }
   S.stop = () => { srcs.forEach(s => { try { s.onended = null; s.stop(); } catch (e) { } }); srcs = []; S.on = false; };
   S.tick = () => { if (S.on && S.ctx.currentTime > S.nextAt - 1.5) sched(S.nextAt, 0); };
   S.time = () => { const lat = Math.min(.2, S.ctx.outputLatency || S.ctx.baseLatency || 0); return S.ctx.currentTime - startAt - lat; };     // film seconds, running on over loops
@@ -4471,6 +4918,808 @@ const Sound = (() => {
   S.grid = (t, div = 8) => { const g = Score.BEAT * 2 / div, n = Math.ceil((t + .012) / g) * g; return n - t; };
   S.raw = () => data;
   return S;
+})();
+
+// ===== 86_ride.js =====
+
+
+const Ride = (() => {
+  const WALK_SPEED = 2.9, RUN_SPEED = 6.8, REVERSE_SPEED = 1.7;
+  const AIR_SPEED = 11.4, AIR_LIMIT = 32, CRUISE_SPEED = 7.4;
+  const BODY_RADIUS = .64, SCREEN_ASPECT = 16 / 9;
+  const cameraLabels = ['跟随镜头', '骑手视角', '侧面跟拍'];
+  const spawn = V3(-12, 0, 0);
+  const state = {
+    pos: spawn.clone(), vel: V3(), t: 0, yaw: PI, pitch: 0, roll: 0,
+    speed: 0, mode: 'walk', phase: 0, s: 0, wing: 0, flap: 0, flapLag: 0,
+    flapSpeed: 0, flapLagSpeed: 0, legs: 0, glide: 0, water: Path.WATER,
+    gait: 0, run: 0, stepLength: .82, direction: 1, air: 0, float: 0,
+    altitude: 0, launching: false, landing: false, touchdown: 0, touchdownWet: false,
+  };
+  const controls = new Set(), eye = V3(), target = V3();
+  const desiredEye = V3(), desiredTarget = V3(), anchor = V3();
+  let obstacles = [], driveSpeed = 0, turnSpeed = 0, verticalSpeed = 0, wingPhase = 0;
+  let launchTime = 0, landingTarget = null, cameraIndex = 0;
+  let orbitYaw = -.38, orbitPitch = .39, distance = 7.8, snapCamera = true;
+
+  function clearControls() { controls.clear(); }
+
+  function setControl(name, active) {
+    if (active) controls.add(name);
+    else controls.delete(name);
+  }
+
+  function landHeight(x, z) {
+    if (x < Path.PIER_END || x > 33.2 || z > 18.8 || z < (x < -67 ? -12.5 : -8.8)) return null;
+    const height = Arch.ground(x, z);
+    return height >= 0 ? height : null;
+  }
+
+  function blocked(x, z, radius, bottom, top) {
+    for (const { min, max } of obstacles) {
+      if (top <= min[1] || bottom >= max[1]) continue;
+      const dx = x - clamp(x, min[0], max[0]), dz = z - clamp(z, min[2], max[2]);
+      if (dx * dx + dz * dz < radius * radius) return true;
+    }
+    return false;
+  }
+
+  function obstacleTop(x, z, y) {
+    let top = Path.WATER;
+    for (const obstacle of obstacles) {
+      const { min, max } = obstacle;
+      if (min[1] >= y + 3.05 || max[1] < y - .55) continue;
+      const dx = x - clamp(x, min[0], max[0]), dz = z - clamp(z, min[2], max[2]);
+      if (dx * dx + dz * dz < .82 ** 2) top = Math.max(top, max[1] + .04);
+    }
+    return top;
+  }
+
+  function standingHeight(x, z) {
+    const height = landHeight(x, z), r = BODY_RADIUS;
+    if (height === null || landHeight(x - r, z) === null || landHeight(x + r, z) === null ||
+      landHeight(x, z - r) === null || landHeight(x, z + r) === null) return null;
+    return blocked(x, z, r, height + .11, height + 3.05) ? null : height;
+  }
+
+  function inFlightArea(x, z) { return x >= -158 && x <= 34 && z >= -88 && z <= 21; }
+
+  function openWater(x, z) {
+    return Water.isWater(x, z) && (x <= Path.PIER_END || x >= -74 || Math.abs(z) >= 2.5) && Arch.ground(x, z) < Path.WATER;
+  }
+
+  function floatingHeight(x, z) {
+    const r = BODY_RADIUS;
+    if (!inFlightArea(x, z) || !openWater(x, z) || !openWater(x - r, z) || !openWater(x + r, z) ||
+      !openWater(x, z - r) || !openWater(x, z + r) || blocked(x, z, r, Path.WATER, Path.WATER + 2.2)) return null;
+    return Water.heightAt(x, z);
+  }
+
+  function surfaceAt(x, z) {
+    const ground = standingHeight(x, z);
+    if (ground !== null) return { y: ground, wet: false };
+    const water = floatingHeight(x, z);
+    return water !== null ? { y: water, wet: true } : null;
+  }
+
+  function landingSpotAt(x, z) {
+    const spot = surfaceAt(x, z);
+    return spot && !blocked(x, z, .88, spot.y, spot.y + 3.1) ? spot : null;
+  }
+
+  function goTo(x, z, yaw = PI) {
+    if (!Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(yaw)) return false;
+    const spot = surfaceAt(x, z);
+    if (!spot) return false;
+    clearControls();
+    state.pos.set(x, spot.y, z);
+    state.vel.set(0, 0, 0);
+    Object.assign(state, {
+      yaw, pitch: 0, roll: 0, speed: 0, mode: spot.wet ? 'float' : 'walk', phase: 0,
+      s: 0, wing: 0, flap: 0, flapLag: 0, flapSpeed: 0, flapLagSpeed: 0, legs: 0, glide: 0,
+      gait: 0, run: 0, stepLength: .82, direction: 1, air: 0, float: Number(spot.wet),
+      altitude: 0, launching: false, landing: false,
+    });
+    driveSpeed = turnSpeed = verticalSpeed = wingPhase = launchTime = 0;
+    landingTarget = null;
+    snapCamera = true;
+    return true;
+  }
+
+  function reset() {
+    obstacles = [...Arch.colliders, ...Stalls.colliders];
+    goTo(spawn.x, spawn.z);
+    state.t = state.touchdown = 0;
+    state.touchdownWet = false;
+    orbitYaw = -.38;
+    orbitPitch = .39;
+    distance = 7.8;
+    cameraIndex = 0;
+  }
+
+  function takeoff() {
+    if (state.mode === 'fly') {
+      if (!state.landing) return false;
+      landingTarget = null;
+      state.landing = false;
+      return true;
+    }
+    state.mode = 'fly';
+    state.launching = true;
+    launchTime = 1.05;
+    driveSpeed = Math.max(driveSpeed, 2.5);
+    verticalSpeed = .38;
+    return true;
+  }
+
+  function land() {
+    if (state.mode !== 'fly' || state.landing) return false;
+    const { pos, yaw } = state;
+    const pick = (offset, range) => {
+      const x = pos.x + Math.cos(yaw + offset) * range;
+      const z = pos.z - Math.sin(yaw + offset) * range;
+      return landingSpotAt(x, z) ? { x, z } : null;
+    };
+    for (const range of [Math.min(16, 4 + driveSpeed), 6, 0, 12, 20]) {
+      for (const offset of [0, .65, -.65, 1.4, -1.4, PI]) {
+        landingTarget = pick(offset, range);
+        if (landingTarget) break;
+      }
+      if (landingTarget) break;
+    }
+    if (!landingTarget) {
+      const nearbyStreet = clamp(pos.x, -71, 29);
+      const spots = [[nearbyStreet, 0], [-12, 0], [Math.min(-78, pos.x), clamp(pos.z, -85, 19)], [clamp(pos.x, -155, 31), -50]];
+      let nearest = Infinity;
+      for (const [x, z] of spots) {
+        const gap = Math.hypot(x - pos.x, z - pos.z);
+        if (gap >= nearest || !landingSpotAt(x, z)) continue;
+        nearest = gap;
+        landingTarget = { x, z };
+      }
+    }
+    if (!landingTarget) return false;
+    state.landing = true;
+    state.launching = false;
+    launchTime = 0;
+    return true;
+  }
+
+  function moveOnSurface(dt, throttle, steer, fast) {
+    const afloat = state.mode === 'float';
+    const limit = afloat ? throttle < 0 ? 1.35 : fast ? 4.6 : 3.25
+      : throttle < 0 ? REVERSE_SPEED : fast ? RUN_SPEED : WALK_SPEED;
+    driveSpeed = damp(driveSpeed, throttle * limit, throttle ? 5 : 11, dt);
+    if (Math.abs(driveSpeed) < .03) driveSpeed = 0;
+    const turnLimit = lerp(2.55, 1.25, clamp(Math.abs(driveSpeed) / RUN_SPEED));
+    turnSpeed = damp(turnSpeed, steer * turnLimit, 15, dt);
+    state.yaw += turnSpeed * dt;
+
+    const { x, z } = state.pos;
+    const nextX = x + Math.cos(state.yaw) * driveSpeed * dt;
+    const nextZ = z - Math.sin(state.yaw) * driveSpeed * dt;
+    const heightAt = afloat ? floatingHeight : standingHeight;
+    const height = heightAt(nextX, nextZ);
+    if (height !== null) state.pos.set(nextX, height, nextZ);
+    else {
+      // Allow movement along the edge of a collider or shore.
+      const heightX = heightAt(nextX, z);
+      if (heightX !== null) state.pos.set(nextX, heightX, z);
+      const heightZ = heightAt(state.pos.x, nextZ);
+      if (heightZ !== null) state.pos.set(state.pos.x, heightZ, nextZ);
+    }
+  }
+
+  function finishLanding(surface, x, z) {
+    state.pos.set(x, surface.y, z);
+    state.mode = surface.wet ? 'float' : 'walk';
+    state.landing = state.launching = false;
+    state.touchdown++;
+    state.touchdownWet = surface.wet;
+    landingTarget = null;
+    verticalSpeed = 0;
+    driveSpeed = Math.min(driveSpeed, surface.wet ? 2.8 : 3.4);
+  }
+
+  function fly(dt, throttle, steer, fast, lift) {
+    if (lift > 0 && state.landing) takeoff();
+    const { x, y, z } = state.pos;
+    let goal = throttle < 0 ? 2.3 : fast ? 16.8 : throttle > 0 ? AIR_SPEED : CRUISE_SPEED;
+    let yawSpeed = steer * lerp(1.85, 1.04, clamp(Math.abs(driveSpeed) / AIR_SPEED));
+    let climb = lift > 0 ? 4.5 : lift < 0 ? -4.2 : 0;
+    if (landingTarget) {
+      const dx = landingTarget.x - x, dz = landingTarget.z - z, range = Math.hypot(dx, dz);
+      const aim = Math.atan2(-dz, dx), turn = mod(aim - state.yaw + PI, TAU) - PI;
+      yawSpeed = range > .20 ? clamp(turn * 3.6, -1.8, 1.8) : 0;
+      goal = range > .20 ? Math.min(5.9, range * 1.4) * Math.max(0, Math.cos(turn)) : 0;
+      climb = range > 10 ? state.altitude < 8 ? 2.4 : 0 : -2.85;
+    } else if (launchTime > 0) {
+      launchTime = Math.max(0, launchTime - dt);
+      state.launching = launchTime > 0;
+      goal = lerp(4.4, goal, 1 - launchTime / 1.05);
+      climb = Math.max(climb, lerp(2.4, 5.4, 1 - launchTime / 1.05));
+    }
+    driveSpeed = damp(driveSpeed, goal, landingTarget ? 5.5 : 2.9, dt);
+    turnSpeed = damp(turnSpeed, yawSpeed, 6, dt);
+    verticalSpeed = damp(verticalSpeed, climb, 4.8, dt);
+    state.yaw += turnSpeed * dt;
+
+    let nextY = clamp(y + verticalSpeed * dt, Path.WATER - .12, AIR_LIMIT);
+    const nextX = x + Math.cos(state.yaw) * driveSpeed * dt;
+    const nextZ = z - Math.sin(state.yaw) * driveSpeed * dt;
+    let floor = Math.max(Path.WATER, Arch.ground(x, z));
+    const destination = inFlightArea(nextX, nextZ) && !blocked(nextX, nextZ, .82, nextY + .13, nextY + 3.05);
+    if (destination) {
+      const nextFloor = Math.max(Path.WATER, Arch.ground(nextX, nextZ));
+      if (nextY >= nextFloor - .04) {
+        state.pos.x = nextX;
+        state.pos.z = nextZ;
+        floor = nextFloor;
+      }
+    }
+    if (landingTarget && goal > .24 && x === state.pos.x && z === state.pos.z) {
+      verticalSpeed = Math.max(verticalSpeed, 2.4);
+      nextY = clamp(y + verticalSpeed * dt, Path.WATER, AIR_LIMIT);
+    }
+    const surface = nextY < floor + 3.15 ? landingSpotAt(state.pos.x, state.pos.z) : null;
+    if (surface && nextY <= surface.y + .025 && verticalSpeed < 0 && !state.launching) {
+      finishLanding(surface, state.pos.x, state.pos.z);
+    } else {
+      const minimum = Math.max(surface ? surface.y : floor + 2.45, obstacleTop(state.pos.x, state.pos.z, y));
+      // Over roofs and outside the traversable square stay clear of the scenery.
+      state.pos.y = Math.max(Math.min(minimum, y), nextY);
+      if (minimum > nextY && !surface && !state.landing) verticalSpeed = Math.max(0, verticalSpeed);
+    }
+  }
+
+  function animate(dt, lift) {
+    const flying = state.mode === 'fly', afloat = state.mode === 'float';
+    state.air = damp(state.air, Number(flying), flying ? 4.8 : 6.8, dt);
+    state.float = damp(state.float, Number(afloat), afloat ? 4.6 : 6.8, dt);
+    state.altitude = flying ? Math.max(0, state.pos.y - Math.max(Path.WATER, Arch.ground(state.pos.x, state.pos.z))) : 0;
+    state.glide = damp(state.glide, flying && !state.launching && !state.landing && lift <= 0 && state.altitude > 4
+      ? .64 * sm(CRUISE_SPEED - .5, AIR_SPEED + 1.1, state.speed) : 0, 2.6, dt);
+    const frequency = lerp(1.52, 1.08, state.glide) + (state.launching || lift > 0 ? .33 : 0);
+    wingPhase += dt * frequency * TAU;
+    const amplitude = (1 - state.glide * .87) * state.air;
+    state.wing = damp(state.wing, flying ? 1 : 0, flying ? 7 : 5.2, dt);
+    state.flap = -Math.sin(wingPhase) * amplitude;
+    state.flapLag = -Math.sin(wingPhase - .54) * amplitude;
+    state.flapSpeed = -Math.cos(wingPhase) * frequency * TAU * amplitude;
+    state.flapLagSpeed = -Math.cos(wingPhase - .54) * frequency * TAU * amplitude;
+    const legs = flying ? state.landing ? sm(.65, 3.8, state.altitude) : state.launching ? 1 - launchTime / 1.05 : 1 : 0;
+    state.legs = damp(state.legs, legs, 6.3, dt);
+
+    const grounded = !flying && !afloat;
+    state.gait = damp(state.gait, grounded ? sm(.10, 1.4, state.speed) : 0, 12, dt);
+    state.run = damp(state.run, grounded && driveSpeed > 0 ? sm(WALK_SPEED, 5.2, state.speed) : 0, 9, dt);
+    if (grounded) state.mode = state.run > .5 ? 'run' : 'walk';
+    if (state.speed > .08) state.direction = Math.sign(driveSpeed);
+    state.stepLength = lerp(.82, 1.30, state.run);
+    state.s += state.speed * dt;
+    if (grounded) state.phase += state.speed * dt / state.stepLength;
+    const roll = flying ? -turnSpeed * .37 * sm(.5, 4.5, state.speed) : -turnSpeed * .048 * state.gait;
+    const pitch = Math.atan2(state.vel.y, Math.max(1, state.speed));
+    state.roll = damp(state.roll, roll, 5.6, dt);
+    state.pitch = damp(state.pitch, flying ? clamp(pitch * .65, -.38, .42) : afloat ? 0 : clamp(pitch * .35, -.16, .16), 5.6, dt);
+  }
+
+  function step(dt) {
+    dt = clamp(dt, 0, .05);
+    if (!dt) return state;
+    const throttle = Number(controls.has('forward')) - Number(controls.has('back'));
+    const steer = Number(controls.has('left')) - Number(controls.has('right'));
+    const lift = Number(controls.has('ascend')) - Number(controls.has('descend'));
+    const fast = controls.has('sprint');
+    const { x, y, z } = state.pos;
+    if (state.mode === 'fly') fly(dt, throttle, steer, fast, lift);
+    else moveOnSurface(dt, throttle, steer, fast);
+    state.vel.set((state.pos.x - x) / dt, (state.pos.y - y) / dt, (state.pos.z - z) / dt);
+    state.speed = Math.hypot(state.vel.x, state.vel.z);
+    animate(dt, lift);
+    state.t += dt;
+    return state;
+  }
+
+  function orbit(dx, dy) {
+    orbitYaw = mod(orbitYaw - dx * .006 + PI, TAU) - PI;
+    orbitPitch = clamp(orbitPitch + dy * .005, .18, 1.05);
+  }
+
+  function zoom(delta) { distance = clamp(distance * Math.exp(delta * .001), 4.4, 13); }
+
+  function cycleCamera() {
+    cameraIndex = (cameraIndex + 1) % cameraLabels.length;
+    snapCamera = true;
+    return cameraLabels[cameraIndex];
+  }
+
+  function camera(ctx) {
+    const { pos, yaw, air, float, pitch } = ctx.st, cam = ctx.cam;
+    const mounted = cameraIndex === 1;
+    if (mounted) {
+      const look = yaw + orbitYaw + .38, tilt = clamp(pitch + .37 - orbitPitch, -.65, .56);
+      desiredEye.set(pos.x + Math.cos(yaw) * .61, pos.y + 3.18 - .56 * float, pos.z - Math.sin(yaw) * .61);
+      desiredTarget.set(desiredEye.x + Math.cos(look) * 8, desiredEye.y + Math.tan(tilt) * 8, desiredEye.z - Math.sin(look) * 8);
+    } else {
+      const angle = yaw + orbitYaw - (cameraIndex === 2 ? 1.14 : 0);
+      const range = distance + air * 1.7, flat = range * Math.cos(orbitPitch);
+      desiredEye.set(pos.x - Math.cos(angle) * flat, pos.y + 1.7 - .5 * float + range * Math.sin(orbitPitch), pos.z + Math.sin(angle) * flat);
+      const lead = lerp(1.1, 2.7, air);
+      desiredTarget.set(pos.x + Math.cos(yaw) * lead, pos.y + 1.65 - .45 * float, pos.z - Math.sin(yaw) * lead);
+    }
+    if (snapCamera) {
+      eye.copy(desiredEye);
+      target.copy(desiredTarget);
+      snapCamera = false;
+    } else {
+      eye.lerp(desiredEye, 1 - Math.exp(-9 * ctx.dt));
+      target.lerp(desiredTarget, 1 - Math.exp(-12 * ctx.dt));
+    }
+
+    anchor.copy(pos).y += 2.15 - .55 * float;
+    const samples = Math.ceil(anchor.distanceTo(eye) / .45);
+    for (let i = 1; i <= samples; i++) {
+      cam.position.lerpVectors(anchor, eye, i / samples);
+      const { x, y, z } = cam.position;
+      if (y < Math.max(Path.WATER, Arch.ground(x, z)) + .18 || blocked(x, z, .2, y - .2, y + .2)) {
+        cam.position.lerpVectors(anchor, eye, Math.max(.08, (i - 1) / samples));
+        break;
+      }
+    }
+    if (!samples) cam.position.copy(eye);
+    cam.up.set(0, 1, 0);
+    cam.near = mounted ? .16 : .12;
+    cam.far = 1400;
+    const fov = mounted ? 67 + (distance - 7.8) * 2.5 : 47 + 6 * ctx.st.run + 8 * air;
+    cam.fov = cam.aspect < SCREEN_ASPECT
+      ? Math.min(90, 2 * Math.atan(Math.tan(deg(fov) / 2) * lerp(SCREEN_ASPECT / cam.aspect, 1, .5)) * 180 / PI)
+      : fov;
+    cam.updateProjectionMatrix();
+    cam.lookAt(target);
+    cam.updateMatrixWorld();
+  }
+
+  function view(ctx) {
+    return { focus: ctx.cam.position.distanceTo(target), aperture: 0, lightFocus: ctx.st.pos, lightBox: 34, tod: 25, shafts: .3, lanGain: .3 };
+  }
+
+  return { state, reset, goTo, setControl, clearControls, step, takeoff, land, camera, view, orbit, zoom, cycleCamera,
+    get cameraLabel() { return cameraLabels[cameraIndex]; } };
+})();
+
+// ===== 86_ride_trail.js =====
+
+
+const RideTrail = (() => {
+  const stops = [
+    { name: '集市入口', x: -25, z: 0, note: 78 },
+    { name: '茶摊街', x: -50, z: 0, note: 84 },
+    { name: '湖边码头', x: -82, z: 0, note: 90 },
+  ];
+  const ring = new THREE.RingGeometry(1.72, 1.84, 64).rotateX(-Math.PI / 2);
+  const diamond = new THREE.OctahedronGeometry(.23);
+  const amber = new THREE.MeshBasicMaterial({ color: '#f6b63d', side: THREE.DoubleSide });
+  const jade = new THREE.MeshBasicMaterial({ color: '#44a89a', side: THREE.DoubleSide });
+  let markers;
+
+  function setActive(scene, active) {
+    if (active && !markers) {
+      markers = new THREE.Group();
+      markers.name = 'ride-checkpoints';
+      for (const stop of stops) {
+        const ground = Arch.ground(stop.x, stop.z);
+        stop.ring = new THREE.Mesh(ring, amber);
+        stop.ring.position.set(stop.x, ground + .035, stop.z);
+        stop.marker = new THREE.Mesh(diamond, amber);
+        stop.marker.position.set(stop.x, ground + 2.15, stop.z);
+        markers.add(stop.ring, stop.marker);
+      }
+      scene.add(markers);
+    }
+    if (markers) markers.visible = active;
+  }
+
+  function reset() {
+    for (const stop of stops) {
+      stop.visited = false;
+      if (!stop.ring) continue;
+      stop.ring.material = amber;
+      stop.marker.visible = true;
+    }
+  }
+
+  function update(ctx) {
+    const { x, z } = ctx.st.pos;
+    let visited = 0, next, distance = Infinity;
+    for (const stop of stops) {
+      const gap = Math.hypot(x - stop.x, z - stop.z);
+      if (!stop.visited && gap < 1.84 && Math.abs(ctx.st.pos.y - stop.ring.position.y) < 1.6) {
+        stop.visited = true;
+        stop.ring.material = jade;
+        stop.marker.visible = false;
+        Sound.hit('bell', { m: stop.note, v: .8 });
+      }
+      if (stop.visited) {
+        visited++;
+      } else {
+        stop.marker.rotation.y = ctx.t * 1.2;
+        stop.marker.position.y = stop.ring.position.y + 2.1 + .15 * Math.sin(ctx.t * 2.1);
+        if (gap < distance) { next = stop; distance = gap; }
+      }
+    }
+    return { speed: ctx.st.speed, visited, total: stops.length,
+      location: next ? `${next.name} · ${Math.round(distance)} 米` : '路线完成' };
+  }
+
+  return { setActive, reset, update };
+})();
+
+// ===== 87_ride_show.js =====
+
+
+const RideShow = (() => {
+  const scenes = [
+    { id: 'opening', label: '开卷日出', detail: '敲版上色，日出后进入立体世界', start: 0, end: 7.2 },
+    { id: 'market', label: '集市巡游', detail: '穿过灯笼街，遇见长颈鹿和乌龟', start: 7.2, end: 24 },
+    { id: 'tea', label: '茶摊小憩', detail: '举杯、抿茶，切入茶杯蒸汽特写', start: 24, end: 28.2 },
+    { id: 'chase', label: '柠檬追逐', detail: '柠檬撞过一排杯碟，最后被鹈鹕接住', start: 28.2, end: 43.8 },
+    { id: 'pier', label: '夕阳码头', detail: '沿码头助跑，展开翅膀飞离木板', start: 43.8, end: 54.6 },
+    { id: 'lanternFlight', label: '穿越灯海', detail: '夜航过热气球和孔明灯，骑手空中喝茶', start: 54.6, end: 69.6 },
+    { id: 'lake', label: '月下落湖', detail: '俯冲、溅水、减速漂浮，湖上再喝一口', start: 69.6, end: 78.6 },
+    { id: 'closing', label: '收画落印', detail: '月湖变回木版画，印章落下', start: 78.6, end: Score.DUR },
+  ].map((scene, i) => ({ ...scene, key: String(i + 1), code: `Digit${i + 1}` }));
+
+  const groups = [
+    { label: '移动与飞行', actions: [
+      { id: 'forward', label: '前进', key: 'W / ↑', hold: true },
+      { id: 'back', label: '后退／减速', key: 'S / ↓', hold: true },
+      { id: 'left', label: '左转', key: 'A / ←', hold: true },
+      { id: 'right', label: '右转', key: 'D / →', hold: true },
+      { id: 'takeoff', label: '展开翅膀', key: '空格', code: 'Space' },
+      { id: 'land', label: '自动降落', key: 'C', code: 'KeyC' },
+      { id: 'ascend', label: '爬升', key: 'Z', code: 'KeyZ', hold: true },
+      { id: 'descend', label: '下降', key: 'X', code: 'KeyX', hold: true },
+      { id: 'sprint', label: '加速', key: 'Shift', hold: true },
+      { id: 'reset', label: '返回起点', key: 'R', code: 'KeyR' },
+    ] },
+    { label: '骑手与道具', actions: [
+      { id: 'honk', label: '鹈鹕鸣叫', key: 'Q', code: 'KeyQ' },
+      { id: 'sip', label: '喝茶', key: 'E', code: 'KeyE' },
+      { id: 'lemon', label: '抛柠檬', key: 'F', code: 'KeyF' },
+      { id: 'lemonRain', label: '柠檬雨', key: 'Shift + F', code: 'KeyF', shift: true },
+      { id: 'lantern', label: '放一盏孔明灯', key: 'L', code: 'KeyL' },
+      { id: 'lanterns', label: '放一组孔明灯', key: 'Shift + L', code: 'KeyL', shift: true },
+    ] },
+    { label: '镜头与画面', actions: [
+      { id: 'style', label: '立体／木版画', key: 'P', code: 'KeyP' },
+      { id: 'time', label: '白昼／落日／月夜', key: 'T', code: 'KeyT' },
+      { id: 'camera', label: '切换视角', key: 'V', code: 'KeyV' },
+      { id: 'fullscreen', label: '全屏', key: 'O', code: 'KeyO' },
+    ] },
+    { label: '音乐', actions: [
+      { id: 'drum', label: '敲鼓', key: 'B', code: 'KeyB' },
+      { id: 'riff', label: '弹一段筝', key: 'Y', code: 'KeyY' },
+      { id: 'score', label: '展开乐谱', key: 'N', code: 'KeyN' },
+      { id: 'mute', label: '切换静音', key: 'M', code: 'KeyM' },
+      { id: 'pause', label: '暂停／继续', key: 'I', code: 'KeyI' },
+      ...['一', '二', '三', '四', '五'].map((note, i) => ({ id: `note${i}`, label: `第${note}弦`, key: `Shift + ${i + 1}`, code: `Digit${i + 1}`, shift: true })),
+    ] },
+    { label: '动作组合', actions: [
+      { id: 'teaCombo', label: '茶摊迎客', key: 'U', code: 'KeyU', detail: '到茶摊，弹筝、喝茶，再鸣叫一声' },
+      { id: 'pierCombo', label: '码头助跑起飞', key: 'G', code: 'KeyG', detail: '到码头，切换落日，鸣叫、助跑、起飞' },
+      { id: 'lanternCombo', label: '夜航放灯', key: 'J', code: 'KeyJ', detail: '切换月夜，起飞，分批放飞孔明灯' },
+      { id: 'landingCombo', label: '降落奉茶', key: 'K', code: 'KeyK', detail: '接地或落水后，喝茶并放一盏灯' },
+      { id: 'cancelCombo', label: '结束组合', key: 'Esc' },
+    ] },
+  ];
+
+  const actionLookup = new Map();
+  for (const { id, code, shift, hold } of [...groups.flatMap(group => group.actions), ...scenes]) {
+    if (code && !hold) actionLookup.set(shift ? `shift:${code}` : code, id);
+  }
+  const actionFor = event => (event.shiftKey && actionLookup.get(`shift:${event.code}`)) || actionLookup.get(event.code);
+
+  const times = [25, 49, 68], timeLabels = ['白昼', '落日', '月夜'];
+  let timeIndex = 0, time = times[0], print = false, printBlend = 0;
+  function setTime(index) { timeIndex = index; }
+  function styleFrame(dt) {
+    printBlend = damp(printBlend, Number(print), 6, dt);
+    time = damp(time, times[timeIndex], 3.2, dt);
+    const amount = printBlend < .001 ? 0 : printBlend > .999 ? 1 : printBlend;
+    LU.uPrint.value = amount;
+    LU.uPrintC.value.x = .5;
+    LU.uPrintC.value.y = .47;
+    Post.fin.uBlocks.value.set(1, 1, 1, 1);
+    Post.fin.uBorder.value = amount;
+    Post.fin.uSeal.value = sm(.5, .99, amount);
+    Post.fin.uFade.value = Post.fin.uFlash.value = 0;
+  }
+
+  const combos = {
+    teaCombo: {
+      steps: [[0, 'place', -38, 0], [0, 'time', 0], [.25, 'riff'], [.4, 'sip'], [2.55, 'honk']], end: 3.2,
+    },
+    pierCombo: {
+      steps: [[0, 'place', -77, 0], [0, 'time', 1], [.15, 'honk'], [.28, 'drive'], [1.22, 'takeoff']], end: 3.2,
+    },
+    lanternCombo: {
+      steps: [[0, 'time', 2], [0, 'takeoff'], [.55, 'riff'], [.85, 'lanterns'], [1.65, 'lanterns'], [2.5, 'lanterns']], end: 3.5,
+    },
+    landingCombo: {
+      steps: [[0, 'land']], after: [[.25, 'sip'], [1.9, 'lantern'], [2.2, 'riff']], end: 2.8,
+    },
+  };
+  let active;
+
+  function startCombo(id, dispatch) {
+    const combo = combos[id];
+    if (!combo) return false;
+    cancelCombo();
+    const item = groups[4].actions.find(action => action.id === id);
+    active = { ...combo, label: item.label, elapsed: 0, next: 0, waiting: Boolean(combo.after), dispatch };
+    return true;
+  }
+
+  function cancelCombo() {
+    if (!active) return false;
+    const { dispatch } = active;
+    active = undefined;
+    dispatch('stopDrive');
+    return true;
+  }
+
+  function stepCombo(dt) {
+    if (!active) return;
+    const combo = active;
+    combo.elapsed += dt;
+    while (combo.next < combo.steps.length && combo.steps[combo.next][0] <= combo.elapsed) {
+      const [, name, ...args] = combo.steps[combo.next++];
+      combo.dispatch(name, ...args);
+      if (active !== combo) return;
+    }
+    if (combo.waiting) {
+      if (Ride.state.mode === 'fly') {
+        if (combo.elapsed > 28) cancelCombo();
+        return;
+      }
+      Object.assign(combo, { steps: combo.after, waiting: false, next: 0, elapsed: 0 });
+    } else if (combo.elapsed >= combo.end) cancelCombo();
+  }
+
+  return {
+    scenes, groups, actionFor, startCombo, stepCombo, cancelCombo, setTime, styleFrame,
+    cycleTime() { setTime((timeIndex + 1) % times.length); return timeLabels[timeIndex]; },
+    cycleStyle() { print = !print; return print ? '木版画' : '立体'; },
+    view(ctx) { return { ...Ride.view(ctx), tod: time, lanGain: lerp(.35, 1.15, sm(55, 67, time)) }; },
+    get label() { return `${print ? '木版画' : '立体'} · ${timeLabels[timeIndex]}`; },
+    get combo() { return active?.label; },
+  };
+})();
+
+// ===== 87_ride_ui.js =====
+
+
+const RideUI = (() => {
+  const canvas = document.getElementById('c');
+  const menu = document.getElementById('ride-menu');
+  const overlay = document.getElementById('ride-interface');
+  const filmEntry = document.getElementById('ride-film-entry');
+  const location = document.getElementById('ride-location');
+  const progress = document.getElementById('ride-progress');
+  const speedometer = document.getElementById('ride-speed');
+  const motion = document.getElementById('ride-motion');
+  const combo = document.getElementById('ride-combo');
+  const comboLabel = document.getElementById('ride-combo-label');
+  const panel = document.getElementById('ride-panel');
+  const panelToggle = document.getElementById('ride-panel-toggle');
+  const panelClose = document.getElementById('ride-panel-close');
+  const viewInfo = document.getElementById('ride-view-info');
+  const panelBody = document.getElementById('ride-panel-body');
+  const actionsTab = document.getElementById('ride-show-actions');
+  const scenesTab = document.getElementById('ride-show-scenes');
+  const actionList = document.getElementById('ride-command-list');
+  const sceneList = document.getElementById('ride-scene-list');
+  const sceneOverlay = document.getElementById('ride-scene');
+  const sceneTitle = document.getElementById('ride-scene-title');
+  const sceneDetail = document.getElementById('ride-scene-detail');
+  const sceneProgress = document.getElementById('ride-scene-progress');
+  const holds = new Map();
+  let onControl, returnFocus;
+
+  function press(source, button) {
+    if (holds.has(source)) return;
+    const name = button.dataset.rideHold;
+    const alreadyHeld = [...holds.values()].some(other => other.dataset.rideHold === name);
+    holds.set(source, button);
+    button.setAttribute('data-held', '');
+    if (!alreadyHeld) onControl(name, true);
+  }
+
+  function release(source) {
+    const button = holds.get(source);
+    if (!button) return;
+    holds.delete(source);
+    const others = [...holds.values()];
+    if (!others.includes(button)) button.removeAttribute('data-held');
+    const name = button.dataset.rideHold;
+    if (!others.some(other => other.dataset.rideHold === name)) onControl(name, false);
+  }
+
+  function releaseAll() {
+    for (const source of holds.keys()) release(source);
+  }
+
+  function releasePanel() {
+    for (const [source, button] of holds) if (panel.contains(button)) release(source);
+  }
+
+  function makeCommand({ id, label, key, detail, hold }) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'ride-button ride-command';
+    if (hold) button.dataset.rideHold = id;
+    else button.dataset.rideAction = id;
+
+    const title = document.createElement('span');
+    title.className = 'ride-command-title';
+    title.textContent = label;
+    button.append(title);
+    if (key) {
+      const hint = document.createElement('kbd');
+      hint.className = 'ride-key';
+      hint.textContent = key;
+      button.append(hint);
+    }
+    if (detail) {
+      const description = document.createElement('span');
+      description.className = 'ride-command-detail';
+      description.textContent = detail;
+      button.append(description);
+    }
+    return button;
+  }
+
+  function populate(groups, scenes) {
+    for (const { label, actions } of groups) {
+      const group = document.createElement('section');
+      group.className = 'ride-command-group';
+      const title = document.createElement('h3');
+      title.textContent = label;
+      const grid = document.createElement('div');
+      grid.className = 'ride-command-grid';
+      grid.append(...actions.map(makeCommand));
+      group.append(title, grid);
+      actionList.append(group);
+    }
+    sceneList.append(...scenes.map(makeCommand));
+    scenesTab.hidden = !scenes.length;
+  }
+
+  function showTab(scenes) {
+    releasePanel();
+    actionList.hidden = scenes;
+    sceneList.hidden = !scenes;
+    actionsTab.setAttribute('aria-pressed', String(!scenes));
+    scenesTab.setAttribute('aria-pressed', String(scenes));
+    panelBody.scrollTop = 0;
+  }
+
+  function closePanel({ focus = true } = {}) {
+    if (panel.hidden) return false;
+    releasePanel();
+    panel.hidden = true;
+    panelToggle.setAttribute('aria-expanded', 'false');
+    if (focus) (returnFocus || panelToggle).focus({ preventScroll: true });
+    return true;
+  }
+
+  function togglePanel(event) {
+    if (overlay.hidden || closePanel()) return false;
+    returnFocus = event && !event.detail ? panelToggle : canvas;
+    panel.hidden = false;
+    panelToggle.setAttribute('aria-expanded', 'true');
+    panel.focus({ preventScroll: true });
+    return true;
+  }
+
+  function bindHold(button) {
+    button.addEventListener('pointerdown', event => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      button.setPointerCapture(event.pointerId);
+      press(event.pointerId, button);
+    });
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+      button.addEventListener(type, event => release(event.pointerId));
+    }
+    function keyboardHold(event) {
+      if (event.key !== ' ' && event.key !== 'Enter') return;
+      event.preventDefault();
+      event.stopPropagation();
+      const source = `key:${event.key}`;
+      if (event.type === 'keydown') press(source, button);
+      else release(source);
+    }
+    button.addEventListener('keydown', keyboardHold);
+    button.addEventListener('keyup', keyboardHold);
+    button.addEventListener('blur', () => {
+      for (const [source, active] of holds) {
+        if (active === button && typeof source === 'string') release(source);
+      }
+    });
+  }
+
+  function install({ select, control, action, groups = [], scenes = [] }) {
+    onControl = control;
+    populate(groups, scenes);
+    panelToggle.addEventListener('click', togglePanel);
+    panelClose.addEventListener('click', () => closePanel());
+    actionsTab.addEventListener('click', () => showTab(false));
+    scenesTab.addEventListener('click', () => showTab(true));
+    for (const button of document.querySelectorAll('[data-ride-mode]')) {
+      button.addEventListener('click', () => select(button.dataset.rideMode));
+    }
+    for (const button of document.querySelectorAll('[data-ride-action]')) {
+      button.addEventListener('click', () => action(button.dataset.rideAction));
+    }
+    for (const button of document.querySelectorAll('[data-ride-hold]')) bindHold(button);
+    window.addEventListener('blur', releaseAll);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) releaseAll();
+    });
+  }
+
+  function ready() {
+    document.getElementById('bar').hidden = true;
+    document.getElementById('st').hidden = true;
+    menu.hidden = false;
+  }
+
+  function setMode(mode) {
+    releaseAll();
+    const riding = mode === 'ride';
+    if (!riding) closePanel({ focus: false });
+    overlay.hidden = !riding;
+    filmEntry.hidden = mode !== 'film';
+    sceneOverlay.hidden = mode !== 'scene';
+    document.body.classList.toggle('ride-active', riding);
+  }
+
+  function renderText(element, value) {
+    if (element.textContent !== value) element.textContent = value;
+  }
+
+  function setScene(scene) {
+    const { label, detail, progress: fraction } = scene || {};
+    renderText(sceneTitle, label || '位点演出');
+    renderText(sceneDetail, detail || '');
+    sceneDetail.hidden = !detail;
+    sceneProgress.hidden = !Number.isFinite(fraction);
+    if (!sceneProgress.hidden) sceneProgress.value = Math.max(0, Math.min(1, fraction));
+  }
+
+  function update({ speed, location: destination, visited, total, status, style, camera, scene }) {
+    const label = destination || '自由骑行';
+    const count = total ? `探索 ${visited} / ${total}` : '';
+    const reading = Number.isFinite(speed) ? `${Math.round(speed * 3.6)} km/h` : '';
+    const view = [style, camera].filter(Boolean).join(' · ');
+    const activeCombo = typeof scene === 'string' ? scene : scene?.label;
+    renderText(location, label);
+    renderText(progress, count);
+    renderText(speedometer, reading);
+    renderText(motion, status || '');
+    renderText(viewInfo, view);
+    if (comboLabel.textContent !== (activeCombo || '')) {
+      comboLabel.textContent = activeCombo || '';
+      if (activeCombo) combo.setAttribute('aria-label', `结束组合 ${activeCombo}`);
+    }
+    motion.hidden = !status;
+    viewInfo.hidden = !view;
+    combo.hidden = !activeCombo;
+  }
+
+  return { install, ready, setMode, update, setScene, togglePanel, closePanel, get panelOpen() { return !panel.hidden; } };
 })();
 
 // ===== 87_scorestrip.js =====
@@ -4560,11 +5809,38 @@ const Film = (() => {
 
 // ---- PLAYER: one clock (the audio clock once sound is on), hands on the world, quality control ------------------------------------------
 const Player = (() => {
-  const cv = document.getElementById('c'), hud = document.getElementById('hud'); let base = 0, paused = false, pausedAt = 0, last = -1, lastNow = 0, running = false, t0 = 0, hudT = 0; const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), P = { x: 0, y: 0, px: 0, py: 0, down: false, moved: 0, t: 0, id: -1, sx: 0, sy: 0 }, wp = V3(), wl = V3(), plane = new THREE.Plane(), nrm = V3(), tmp = V3(); let pinch = 0, ptrs = new Map();
+  const cv = document.getElementById('c'), hud = document.getElementById('hud'); let base = 0, paused = false, pausedAt = 0, last = -1, lastNow = 0, running = false, hudT = 0; const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), P = { x: 0, y: 0, px: 0, py: 0, down: false, moved: 0, t: 0, id: -1, sx: 0, sy: 0 }, wp = V3(), wl = V3(), plane = new THREE.Plane(), nrm = V3(), tmp = V3(); let pinch = 0, ptrs = new Map();
+  let mode = 'film', filmAt = 0, rideAt = 6, rideStarted = false, loader, chapter, savedFilmView;
+  const keyboard = new Set(), touch = new Set(), automatic = new Set();
+  const rideKeys = {
+    KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back',
+    KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
+    ShiftLeft: 'sprint', ShiftRight: 'sprint', KeyZ: 'ascend', KeyX: 'descend',
+  };
   const say = (s, ms = 3600) => { hud.textContent = s; hud.style.opacity = 1; clearTimeout(hudT); hudT = setTimeout(() => hud.style.opacity = 0, ms); };
   const raw = () => paused ? pausedAt : Sound.on ? Sound.time() : (performance.now() - base) / 1000;         // runs on over loops
-  function sound() { if (!Sound.open()) return; const go = () => { if (!Sound.ready) return Sound.prepareDone ? 0 : setTimeout(go, 120); if (Sound.on) return; const t = ((raw() % Score.DUR) + Score.DUR) % Score.DUR; Sound.play(t); }; Sound.ctx.resume().then(go); }
-  function toggle() { if (paused) { paused = false; base = performance.now() - pausedAt * 1000; if (Sound.ctx && Sound.ready) { Sound.ctx.resume(); Sound.play(pausedAt % Score.DUR); } } else { pausedAt = raw() % Score.DUR; paused = true; Sound.stop(); } }
+  const clock = () => mode === 'scene' ? clamp(raw(), chapter.start, chapter.end) : mode === 'ride' ? Math.max(0, raw()) % Score.DUR : mod(raw(), Score.DUR);
+  function sound() {
+    if (!running || paused || Sound.on || !Sound.ready || !Sound.open()) return;
+    const requestedMode = mode;
+    Sound.ctx.resume().then(() => {
+      if (mode === requestedMode && !paused && !Sound.on && Sound.ctx.state === 'running') {
+        Sound.play(clock(), mode === 'ride');
+      }
+    }).catch(() => {});
+  }
+  function toggle() {
+    if (paused) {
+      paused = false;
+      base = performance.now() - pausedAt * 1000;
+      if (Sound.ctx && Sound.ready) Sound.ctx.resume().then(() => { if (!paused && !Sound.on) Sound.play(clock(), mode === 'ride'); }).catch(() => {});
+    } else {
+      pausedAt = clock();
+      paused = true;
+      Sound.stop();
+      if (mode === 'ride') { keyboard.clear(); touch.clear(); for (const name of Object.values(rideKeys)) syncControl(name); }
+    }
+  }
   // ---- live notes: what the world answers with
   Score.onLive = (tr, e) => { const d = Math.max(0, e.t - Main.ctx.t), map = { koto: 'koto', bell: 'bell', lemon: 'bowl', lemon2: 'bowl', taiko: 'taiko', wood: 'wood1', chord: 'burner' }, k = map[tr]; if (!k) return; Sound.hit(k, { m: e.m, v: (e.v || .8) * (k === 'taiko' ? .8 : .7), delay: d, pan: e.pan || 0 }); };
   const THUD = { stone: ['lemon', .5], wood: ['lemon', .6], cloth: ['boing', .5], bird: ['boing', .35], kick: ['lemon', .6], folk: ['lemon', .4], fruit: ['lemon', .28], water: ['drop', .7] }; let lastThud = 0;
@@ -4578,28 +5854,267 @@ const Player = (() => {
     if (best && best.distance < 140) { let r; try { r = bo.poke(best, ctx); } catch (e) { console.warn('poke', bo.name, e); } let snd = typeof r === 'string' ? r : NAMES[bo.name], o = best.object, dl = 0; if (bo.name === 'beasts') { while (o && !(o.userData && o.userData.beast)) o = o.parent; snd = o ? BEAST[o.userData.beast.name] : 0; } else if (bo.name === 'stalls' && !best.object.isInstancedMesh) snd = 'boing'; else if (bo.name === 'arch') snd = 'wood0'; else if (bo.name === 'land') snd = 'leaf'; else if (bo.name === 'rider') dl = .62; if (snd) Sound.hit(snd, { v: .8, pan: ndc.x * .6, delay: dl }); if (typeof Lemons !== 'undefined') Lemons.ring(best.point, 60 + (best.point.y * 5) % 24, ctx.t, .7); return bo.name; }
     throwLemon(); return 'lemon'; }
   function throwLemon(v = 11) { const c = Main.cam, d = ray.ray.direction, o = c.position, st = Main.ctx.st; const b = Phys.add({ x: o.x + d.x * .9, y: o.y + d.y * .9 - .12, z: o.z + d.z * .9, vx: d.x * v + st.vel.x * .7, vy: d.y * v + 2.6, vz: d.z * v + st.vel.z * .7, r: .095, live: true }); Sound.hit('whoosh', { v: .25, rate: 1.5 }); return b; }
-  function keys(e) { if (e.metaKey || e.ctrlKey || e.altKey) return; const k = e.key.toLowerCase(), ctx = Main.ctx, t = ctx.t; if (!Sound.on) sound(); const row = 'asdfghjkl;'.indexOf(k); if (row >= 0 && !e.repeat) { const sc = Score.scaleAt(t), m = sc[row % 5] + 12 * (1 + Math.floor(row / 5)); Score.live('koto', { t, m, r: clamp(Math.round((m - 50) / 4.2), 0, 7), v: .95 }); if (typeof Rider !== 'undefined' && Rider.drop) Rider.drop(row / 10, .5, .6); return; }
+
+  function tossLemons(rain) {
+    const { pos, yaw, vel } = Ride.state;
+    const fx = Math.cos(yaw), fz = -Math.sin(yaw), sx = -fz, sz = fx;
+    const count = rain ? 12 : 1;
+    for (let i = 0; i < count; i++) {
+      const spread = rain ? ((i % 5) - 2) * .45 : .42;
+      const reach = rain ? 2.5 + Math.floor(i / 5) * 1.5 : 1.1;
+      const speed = rain ? 2.6 : 9.5;
+      Phys.add({ x: pos.x + fx * reach + sx * spread, y: pos.y + (rain ? 6.2 + i % 3 * .55 : 2.7),
+        z: pos.z + fz * reach + sz * spread, vx: fx * speed + vel.x * .6 + sx * spread,
+        vy: rain ? .6 + i % 3 * .35 : 3.3, vz: fz * speed + vel.z * .6 + sz * spread, r: .088, live: true });
+    }
+    Sound.hit('whoosh', { v: rain ? .64 : .35 });
+  }
+
+  function syncControl(name) {
+    Ride.setControl(name, automatic.has(name) || touch.has(name) || [...keyboard].some(code => rideKeys[code] === name));
+  }
+
+  function clearControls() {
+    RideShow.cancelCombo();
+    keyboard.clear();
+    touch.clear();
+    automatic.clear();
+    Ride.clearControls();
+  }
+
+  function touchControl(name, held) {
+    if (mode !== 'ride') return;
+    if (held) { if (name !== 'sprint') RideShow.cancelCombo(); touch.add(name); sound(); }
+    else touch.delete(name);
+    syncControl(name);
+  }
+
+  function resetRide() {
+    clearControls();
+    Phys.bodies.length = 0;
+    Ride.reset();
+    RideTrail.reset();
+    Air.clearRideLanterns();
+    Pelican.resetRideActions?.();
+    Rider.resetRideActions?.();
+    last = -1;
+  }
+
+  function playStrings(t, notes) {
+    const scale = Score.scaleAt(t);
+    for (const [index, delay] of notes) {
+      const start = t + delay;
+      const m = scale[index] + 12;
+      Score.live('koto', { t: start, m, r: clamp(Math.round((m - 50) / 4.2), 0, 7), v: .85 });
+    }
+  }
+
+  function fullscreen() {
+    const change = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+    change?.catch(() => say('当前窗口无法切换全屏'));
+  }
+
+  function rideAction(action, ...args) {
+    if (!running) return;
+    if (mode === 'scene' && action === 'stopScene') { select('ride'); return; }
+    const nextChapter = RideShow.scenes.find(item => item.id === action);
+    if (nextChapter && (mode === 'ride' || mode === 'scene')) { select('scene', true, nextChapter); return; }
+    if (mode !== 'ride') return;
+    sound();
+    const t = Main.ctx.t, rideTime = Ride.state.t;
+    if (RideShow.startCombo(action, rideAction)) {
+      keyboard.clear(); touch.clear(); Ride.clearControls();
+      RideUI.closePanel({ focus: false });
+      return;
+    }
+    if (action.startsWith('note')) { playStrings(t, [[Number(action.at(-1)), 0]]); return; }
+    switch (action) {
+      case 'panel': RideUI.togglePanel(); break;
+      case 'reset': resetRide(); break;
+      case 'cancelCombo': if (RideShow.cancelCombo()) say('已恢复手动控制'); break;
+      case 'takeoff': if (Ride.takeoff()) Sound.hit('whoosh', { v: .7 }); break;
+      case 'land': if (Ride.land()) say('正在寻找可降落的位置'); break;
+      case 'honk': Pelican.honk(rideTime, true); Sound.hit('honk', { v: .75 }); break;
+      case 'sip': if (Rider.sip(rideTime, true)) Sound.hit('slurp', { v: .5, delay: .62 }); break;
+      case 'lemon': case 'lemonRain': tossLemons(action === 'lemonRain'); break;
+      case 'lantern': case 'lanterns': {
+        const count = Air.releaseLanterns(Main.ctx, action === 'lantern' ? 1 : 7);
+        if (count) { Sound.hit('bell', { m: count > 1 ? 86 : 79, v: .52 }); say(`放飞 ${count} 盏孔明灯`); }
+        break;
+      }
+      case 'style': say(RideShow.cycleStyle()); break;
+      case 'time': if (args.length) RideShow.setTime(args[0]); else say(RideShow.cycleTime()); break;
+      case 'camera': say(Ride.cycleCamera()); break;
+      case 'fullscreen': fullscreen(); break;
+      case 'mute': Sound.mute(!Sound.muted); say(Sound.muted ? '已静音' : '声音开启'); break;
+      case 'pause': toggle(); break;
+      case 'score': Strip.toggle(); break;
+      case 'drum': Score.live('taiko', { t, v: 1, sz: 1 }); break;
+      case 'riff': playStrings(t, [[0, 0], [2, .15], [3, .30], [4, .60], [1, .75], [0, .90]]); break;
+      case 'place': if (Ride.goTo(args[0], args[1], PI)) last = -1; else RideShow.cancelCombo(); break;
+      case 'drive': case 'stopDrive':
+        for (const name of ['forward', 'sprint']) {
+          if (action === 'drive') automatic.add(name); else automatic.delete(name);
+          syncControl(name);
+        }
+        break;
+    }
+  }
+
+  function rideKey(e) {
+    if (e.code === 'Space' && e.target instanceof HTMLButtonElement) return;
+    const control = rideKeys[e.code];
+    if (control) {
+      e.preventDefault();
+      if (e.repeat && RideShow.combo && !keyboard.has(e.code)) return;
+      if (!e.repeat && control !== 'sprint') RideShow.cancelCombo();
+      keyboard.add(e.code);
+      syncControl(control);
+      sound();
+      return;
+    }
+    if (e.repeat) return;
+    if (e.code === 'Escape') {
+      if (!RideUI.closePanel()) rideAction('cancelCombo');
+      return;
+    }
+    const action = e.code === 'KeyH' ? 'panel' : RideShow.actionFor(e);
+    if (action) { e.preventDefault(); rideAction(action); }
+  }
+
+  function keys(e) { if (!running || e.metaKey || e.ctrlKey || e.altKey) return; if (mode === 'ride') return rideKey(e); if (mode === 'scene') { if (e.repeat) return; if (e.code === 'Escape') select('ride'); else if (e.code === 'KeyM') Sound.mute(!Sound.muted); else if (e.code === 'Space' && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); toggle(); } else if (/^Digit[1-8]$/.test(e.code) && !e.shiftKey) rideAction(RideShow.actionFor(e)); return; } const k = e.key.toLowerCase(), ctx = Main.ctx, t = ctx.t; if (k === ' ' && e.target instanceof HTMLButtonElement) return; if (!Sound.on) sound(); const row = 'asdfghjkl;'.indexOf(k); if (row >= 0 && !e.repeat) { const sc = Score.scaleAt(t), m = sc[row % 5] + 12 * (1 + Math.floor(row / 5)); Score.live('koto', { t, m, r: clamp(Math.round((m - 50) / 4.2), 0, 7), v: .95 }); if (typeof Rider !== 'undefined' && Rider.drop) Rider.drop(row / 10, .5, .6); return; }
     if (k === ' ') { e.preventDefault(); toggle(); } else if (k === 'n') Strip.toggle(); else if (k === 'q') { if (typeof Pelican !== 'undefined' && Pelican.honk) Pelican.honk(t); Sound.hit('honk', { v: .75 }); } else if (k === 'w') { if (typeof Rider !== 'undefined' && Rider.sip) Rider.sip(t); Sound.hit('slurp', { v: .5, delay: .62 }); } else if (k === 'e') { for (let i = 0; i < 10; i++) Phys.add({ x: ctx.st.pos.x - 1.2 - Math.random() * 3, y: ctx.st.pos.y + 5 + Math.random() * 2.5, z: ctx.st.pos.z - 2.6 + Math.random() * 4, vx: ctx.st.vel.x, vy: 0, vz: ctx.st.vel.z, live: true, r: .085 }); } else if (k === 'b') Score.live('taiko', { t, v: 1, sz: 1 }); else if (k === 'p') { Film.printLock = Film.printLock === undefined ? 1 : undefined; } else if (k === 'r') { Film.free.tride = Film.free.tride ? 0 : 1; } else if (k === 'm') { Sound.mute(!Sound.muted); say(Sound.muted ? 'muted' : 'sound on', 1200); } else if (k === 'x') { if (document.fullscreenElement) document.exitFullscreen(); else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); } else if (k === '?' || k === '/') say(HELP, 8000); else if (k === 'arrowright' || k === 'arrowleft') seek((((raw() % Score.DUR) + (k === 'arrowright' ? 4.8 : -4.8)) + Score.DUR) % Score.DUR); }
   function seek(t) { base = performance.now() - t * 1000; if (paused) pausedAt = t; if (Sound.on) Sound.play(t); last = -1; }
   const HELP = 'tap anything to play it · tap air to throw a lemon · drag to look, scroll to zoom · A–; koto · B drum · Q honk · W sip · E lemons · R ride · P print · N the score · space pause · M mute · X full screen';
+  function orbit(dx, dy) {
+    if (mode === 'ride') Ride.orbit(dx, dy);
+    else {
+      Film.free.tyaw -= dx * .0052;
+      Film.free.tpitch = clamp(Film.free.tpitch + dy * .0036, -.9, 1.1);
+      Film.free.hold = 3.2;
+    }
+  }
+
+  function zoom(delta, held) {
+    if (mode === 'ride') Ride.zoom(delta);
+    else {
+      Film.free.tzoom = clamp(Film.free.tzoom * Math.exp(delta * .0011), held ? .45 : .4, held ? 2.2 : 2.4);
+      Film.free.hold = 3.2;
+    }
+  }
+
   function events() {
     const opt = { passive: false }; cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); P.down = true; P.moved = 0; P.sx = P.px = e.clientX; P.sy = P.py = e.clientY; P.t = performance.now(); if (!Sound.on) { sound(); } });
-    cv.addEventListener('pointermove', e => { const now = performance.now(), dt = (now - (P.lt || now)) / 1000; P.lt = now; gust(e.clientX, e.clientY, dt); if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, [e.clientX, e.clientY]); if (ptrs.size === 2) { const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) { Film.free.tzoom = clamp(Film.free.tzoom * pinch / d, .45, 2.2); Film.free.hold = 3; } pinch = d; P.moved = 99; return; } if (P.down) { const dx = e.clientX - P.px, dy = e.clientY - P.py; P.moved += Math.abs(dx) + Math.abs(dy); if (P.moved > 8) { Film.free.tyaw -= dx * .0052; Film.free.tpitch = clamp(Film.free.tpitch + dy * .0036, -.9, 1.1); Film.free.hold = 3.2; cv.style.cursor = 'grabbing'; } } P.px = e.clientX; P.py = e.clientY; });
-    const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = 0; if (P.down && P.moved <= 8 && e.type === 'pointerup') poke(e.clientX, e.clientY); P.down = false; cv.style.cursor = 'grab'; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('wheel', e => { e.preventDefault(); Film.free.tzoom = clamp(Film.free.tzoom * Math.exp(e.deltaY * .0011), .4, 2.4); Film.free.hold = 3.2; }, opt); addEventListener('keydown', keys); document.addEventListener('visibilitychange', () => { if (document.hidden && Sound.on && !paused) { P.auto = true; toggle(); } else if (!document.hidden && P.auto) { P.auto = false; if (paused) toggle(); } }); }
+    cv.addEventListener('pointermove', e => { const now = performance.now(), dt = (now - (P.lt || now)) / 1000; P.lt = now; gust(e.clientX, e.clientY, dt); if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, [e.clientX, e.clientY]); if (ptrs.size === 2) { const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch && d > 0) zoom(Math.log(pinch / d) / .0011, true); pinch = d; P.moved = 99; return; } if (P.down) { const dx = e.clientX - P.px, dy = e.clientY - P.py; P.moved += Math.abs(dx) + Math.abs(dy); if (P.moved > 8) { orbit(dx, dy); cv.style.cursor = 'grabbing'; } } P.px = e.clientX; P.py = e.clientY; });
+    const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = 0; if (running && P.down && P.moved <= 8 && e.type === 'pointerup') poke(e.clientX, e.clientY); P.down = false; cv.style.cursor = 'grab'; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('wheel', e => { if (running) { e.preventDefault(); zoom(e.deltaY, false); } }, opt);
+    addEventListener('keydown', keys);
+    addEventListener('keyup', e => { if (keyboard.delete(e.code)) syncControl(rideKeys[e.code]); });
+    addEventListener('blur', clearControls);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) clearControls();
+      if (mode === 'ride') return;
+      if (document.hidden && Sound.on && !paused) { P.auto = true; toggle(); }
+      else if (!document.hidden && P.auto) { P.auto = false; if (paused) toggle(); }
+    });
+  }
   // keep 60: if frames run long for a while, render a little smaller; climb back when there is room
   let ema = 16, badT = 0, goodT = 0; function govern(ms, now) { ema += (ms - ema) * .06; if (ema > 21 && now - badT > 1400 && Main.quality > .56) { Main.quality = Math.max(.56, Main.quality * .88); badT = now; ema = 17; } if (ema < 12.5 && now - goodT > 6000 && Main.quality < 1) { Main.quality = Math.min(1, Main.quality * 1.08); goodT = now; } }
   function frame(now) {
-    if (!running) return; requestAnimationFrame(frame); const r = raw(), t = ((r % Score.DUR) + Score.DUR) % Score.DUR, loop = last >= 0 && t < last - 1; const dtR = last < 0 ? 1 / 60 : loop ? 1 / 60 : t - last; const jump = last < 0 || Math.abs(dtR) > .5 || loop;
+    if (!running) return; requestAnimationFrame(frame); const t = clock(), loop = last >= 0 && t < last - 1; const dtR = last < 0 ? 1 / 60 : loop ? 1 / 60 : t - last; const jump = last < 0 || Math.abs(dtR) > .5 || loop;
     if (P.vx !== undefined) { const k = Math.exp(-5 * (now - lastNow) / 1000); P.vx *= k; P.vy *= k; P.vz *= k; Wind.wake(1, wp.x, wp.y, wp.z, 1.7, P.vx, P.vy, P.vz, .16); }
-    const ms = now - lastNow; lastNow = now; Sound.tick(); G.t = t; if (jump) { if (loop) Score.clearLive(); Main.update(t, 1 / 60, true); } else if (dtR > 0 || paused) { let dt = clamp(dtR, 0, .1); if (dt > .034) { const n = Math.ceil(dt / .0167); for (let i = 1; i <= n; i++) Main.update(last + dt * i / n, dt / n, false); } else Main.update(t, dt, false); } last = t; Main.draw(); Strip.draw(t); if (ms < 100) govern(ms, now); window.__fps = 1000 / ema; }
+    const ms = now - lastNow; lastNow = now; Sound.tick(); G.t = t;
+    if (loop) Score.clearLive();
+    if (mode === 'ride') {
+      const dt = paused ? 0 : clamp(ms / 1000, 0, .05);
+      if (!paused) RideShow.stepCombo(dt);
+      const step = Math.floor(Ride.state.phase);
+      const landed = Ride.state.touchdown;
+      if (!paused || last < 0) Main.update(t, dt, jump || last < 0, true);
+      const { pos, speed, phase, mode: motion, touchdown, touchdownWet, landing } = Ride.state;
+      if (touchdown !== landed) Sound.hit(touchdownWet ? 'splash' : 'hoof', { v: .65 });
+      if ((motion === 'walk' || motion === 'run') && Math.floor(phase) > step && speed > .35) {
+        Sound.hit(pos.x < -74 ? 'plank' + Math.floor(phase) % 4 : 'hoof', { v: .35 });
+      }
+      const flight = motion === 'fly' ? `飞行 ${Math.round(Ride.state.altitude)} 米` : motion === 'float' ? '水面漂浮' : '地面骑行';
+      const status = paused ? '已暂停' : landing ? '正在降落' : flight;
+      RideUI.update({ ...RideTrail.update(Main.ctx), status, style: RideShow.label, camera: Ride.cameraLabel, scene: RideShow.combo });
+    } else if (jump) Main.update(t, 1 / 60, true);
+    else if (dtR > 0 || paused) {
+      const dt = clamp(dtR, 0, .1);
+      if (dt > .034) {
+        const n = Math.ceil(dt / .0167);
+        for (let i = 1; i <= n; i++) Main.update(last + dt * i / n, dt / n, false);
+      } else Main.update(t, dt, false);
+    }
+    last = t;
+    Main.draw();
+    if (mode !== 'scene') Strip.draw(t);
+    else {
+      RideUI.setScene({ ...chapter, progress: (t - chapter.start) / (chapter.end - chapter.start) });
+      if (t >= chapter.end) select('ride');
+    }
+    if (ms < 100) govern(ms, now); window.__fps = 1000 / ema;
+  }
+
+  function select(next, withSound = true, scene) {
+    if (running && next === mode && mode !== 'scene') return;
+    if (running) {
+      if (mode === 'ride') rideAt = clock();
+      else if (mode === 'film') filmAt = clock();
+    }
+    if (next === 'scene') {
+      if (mode !== 'scene') savedFilmView = { camera: { ...Film.free }, printLock: Film.printLock };
+      Object.assign(Film.free, { yaw: 0, pitch: 0, zoom: 1, tyaw: 0, tpitch: 0, tzoom: 1, hold: 0, ride: 0, tride: 0 });
+      Film.printLock = undefined;
+    } else if (mode === 'scene') {
+      Object.assign(Film.free, savedFilmView.camera);
+      Film.printLock = savedFilmView.printLock;
+      savedFilmView = undefined;
+    }
+    Sound.stop();
+    Phys.bodies.length = 0;
+    Score.clearLive();
+    clearControls();
+    paused = P.auto = false;
+    mode = next;
+    chapter = scene;
+    if (mode === 'ride' && !rideStarted) { resetRide(); rideStarted = true; }
+    if (Strip.on) Strip.toggle();
+    RideTrail.setActive(Main.scene, mode === 'ride');
+    RideUI.setMode(mode);
+    RideUI.setScene(chapter ? { ...chapter, progress: 0 } : null);
+    hud.style.opacity = 0;
+    last = -1;
+    lastNow = performance.now();
+    const startAt = mode === 'scene' ? chapter.start : mode === 'ride' ? rideAt : filmAt;
+    base = lastNow - startAt * 1000;
+    if (!running) {
+      if (loader) {
+        loader.style.opacity = 0;
+        loader.style.pointerEvents = 'none';
+        loader.inert = true;
+        setTimeout(() => loader.remove(), 900);
+      }
+      running = true;
+      requestAnimationFrame(frame);
+    }
+    if (withSound) sound();
+  }
+
   async function start(ld) {
-    Sound.prepare(); events(); const b = ld && ld.querySelector('b'), stt = document.getElementById('st'), bar = document.getElementById('bar'); if (bar) bar.style.opacity = 0;
+    loader = ld;
+    const preparing = Sound.prepare();
+    events();
+    RideUI.install({ select, control: touchControl, action: rideAction, groups: RideShow.groups, scenes: RideShow.scenes });
+    const stt = document.getElementById('st'), bar = document.getElementById('bar'); if (bar) bar.style.opacity = 0;
     Main.update(0, 1 / 60, true); Main.draw(); Main.draw(); // compile what the first frames need
     for (const t of [3, 8, 22, 27, 33, 47, 55, 63, 70, 73, 77]) { Main.update(t, 1 / 60, true); Main.draw(); await new Promise(r => setTimeout(r, 0)); }
-    if (stt) stt.textContent = 'tuning the strings'; await new Promise(r => { if (Sound.ready) return r(); const w = setInterval(() => { if (Sound.ready) { clearInterval(w); r(); } }, 60); });
-    const begin = withSound => { if (running) return; if (ld) { ld.style.opacity = 0; ld.style.pointerEvents = 'none'; setTimeout(() => ld.remove(), 900); } running = true; last = -1; lastNow = performance.now(); base = performance.now(); if (withSound && Sound.open()) Sound.ctx.resume().then(() => Sound.play(0)); requestAnimationFrame(frame); setTimeout(() => say(withSound ? 'tap anything · drag to look around · ? for keys' : 'tap for sound', withSound ? 4200 : 9000), withSound ? 6200 : 1500); };
-    if (Q.has('auto')) return begin(false); let allowed = false; try { const c = Sound.open(); if (c) { await Promise.race([c.resume(), new Promise(r => setTimeout(r, 250))]); allowed = c.state === 'running'; } } catch (e) { }
-    if (allowed) return begin(true); if (stt) { stt.textContent = 'press to begin'; stt.style.cssText += ';opacity:1;padding:12px 18px;border:1.5px solid #c63a2a;color:#c63a2a;border-radius:3px;margin-top:8px;cursor:pointer;font-size:12px'; } const go = () => { removeEventListener('keydown', go); begin(true); }; if (ld) { ld.style.cursor = 'pointer'; ld.addEventListener('pointerup', go, { once: true }); } addEventListener('keydown', go, { once: true }); setTimeout(() => begin(false), 14000); }
+    if (stt) stt.textContent = 'tuning the strings';
+    await preparing;
+    if (Q.has('ride')) select('ride', false);
+    else if (Q.has('auto')) select('film', false);
+    else RideUI.ready();
+  }
   return { start, seek, poke, say, raw, get paused() { return paused; } };
 })();
 
@@ -4607,7 +6122,7 @@ const Player = (() => {
 
 // ---- MAIN: renderer, build, clock, frame. Studio mode (?studio=name) shows single assets under the film's light ---------------------------
 const Main = (() => {
-  const cv = document.getElementById('c'); let frameN = 0, R, scene, cam, W = 0, H = 0, last = -1, started = false, quality = 1; const ctx = { t: 0, dt: 1 / 60, st: null, reset: true, live: !CAPTURE };
+  const cv = document.getElementById('c'); let frameN = 0, R, scene, cam, W = 0, H = 0, last = -1, quality = 1; const ctx = { t: 0, dt: 1 / 60, st: null, reset: true, live: !CAPTURE, freeRide: false };
   const STUDIO = Q.get('studio');
   function size(force) { const cw = innerWidth, ch = innerHeight, dpr = CAPTURE ? 1 : Math.min(devicePixelRatio || 1, 2); let k = dpr * quality; const MAX = CAPTURE ? 1e9 : 3.7e6; if (cw * ch * k * k > MAX) k = Math.sqrt(MAX / (cw * ch)); const w = Math.max(2, Math.round(cw * k)), h = Math.max(2, Math.round(ch * k)); if (w === W && h === H && !force) return; W = w; H = h; R.setPixelRatio(1); R.setSize(W, H, false); Post.size(W, H); cam.aspect = W / H; cam.updateProjectionMatrix(); }
   const tick = () => new Promise(r => setTimeout(r, 0));
@@ -4619,11 +6134,22 @@ const Main = (() => {
     if (STUDIO) Studio.build();
     G.info.load = Math.round(performance.now()); R.compile(scene, cam);
   }
-  function update(t, dt, reset) { ctx.t = t; ctx.dt = dt; ctx.reset = reset; LU.uTime.value = t; LU.uBeat.value = t / Score.BEAT; ctx.st = Path.bird(t); if (STUDIO) Studio.pre(ctx); else { const s = ctx.st; Wind.wake(0, s.pos.x, s.pos.y + 1.6, s.pos.z, s.mode === 'fly' ? 5 : 1.9, s.vel.x, s.vel.y, s.vel.z, s.mode === 'fly' ? .22 : .10); }
-    if (typeof Film !== 'undefined' && !STUDIO) Film.update(ctx);
+  function update(t, dt, reset, freeRide = false) {
+    ctx.t = t; ctx.dt = dt; ctx.reset = reset; ctx.freeRide = freeRide;
+    LU.uTime.value = t; LU.uBeat.value = t / Score.BEAT;
+    ctx.st = freeRide ? Ride.step(dt) : Path.bird(t);
+    if (STUDIO) Studio.pre(ctx);
+    else {
+      const s = ctx.st;
+      Wind.wake(0, s.pos.x, s.pos.y + 1.6, s.pos.z, s.mode === 'fly' ? 5 : 1.9, s.vel.x, s.vel.y, s.vel.z, s.mode === 'fly' ? .22 : .10);
+    }
+    if (freeRide) {
+      RideShow.styleFrame(dt);
+      Ride.camera(ctx);
+    } else if (typeof Film !== 'undefined' && !STUDIO) Film.update(ctx);
     for (const a of Assets.list) if (a.ok && a.update) { try { a.update(ctx); } catch (e) { if (!a.err) { a.err = 1; G.errors.push(a.name + ' update: ' + (e.stack || e)); console.error('UPDATE ' + a.name, e.stack || e); } } }
     last = t; }
-  function draw() { const o = STUDIO ? Studio.view(ctx) : typeof Film !== 'undefined' ? Film.view(ctx) : { focus: 8 }; cam.updateMatrixWorld(); R.info.reset(); const f = o.lightFocus || ctx.st.pos; Sky.apply(o.tod === undefined ? ctx.t : o.tod, f, o.lightBox || 34); Post.fin.uExp.value = Sky.S.ex * (o.exposure || 1); Lan.update(f.x, f.z, o.lanGain === undefined ? lerp(.10, 1, Sky.S.night) : o.lanGain);
+  function draw() { const o = ctx.freeRide ? RideShow.view(ctx) : STUDIO ? Studio.view(ctx) : typeof Film !== 'undefined' ? Film.view(ctx) : { focus: 8 }; cam.updateMatrixWorld(); R.info.reset(); const f = o.lightFocus || ctx.st.pos; Sky.apply(o.tod === undefined ? ctx.t : o.tod, f, o.lightBox || 34); Post.fin.uExp.value = Sky.S.ex * (o.exposure || 1); Lan.update(f.x, f.z, o.lanGain === undefined ? lerp(.10, 1, Sky.S.night) : o.lanGain);
     R.shadowMap.autoUpdate = false; R.shadowMap.needsUpdate = false; const oddOnly = !CAPTURE && !ctx.reset && ctx.t > 1 && ctx.t < 48; for (const a of Assets.list) if (a.ok && a.prepass) { if (oddOnly && a.name === 'water' && (frameN & 1) === 1) continue; try { a.prepass(R, scene, cam, ctx); } catch (e) { if (!a.perr) { a.perr = 1; console.error('PREPASS ' + a.name, e.stack || e); } } }
     frameN++; R.shadowMap.autoUpdate = false; R.shadowMap.needsUpdate = CAPTURE || ctx.reset || (frameN & 1) === 0; Post.render(scene, cam, o); G.info.tris = R.info.render.triangles; G.info.calls = R.info.render.calls; G.info.w = W; G.info.h = H; }
   // exact frame for QA: a jump warms the springs and cloth up over the 1.6 s before it
