@@ -305,11 +305,13 @@ const Ride = (() => {
 
   function zoom(delta) { distance = clamp(distance * Math.exp(delta * .001), 4.4, 13); }
 
-  function cycleCamera() {
-    cameraIndex = (cameraIndex + 1) % cameraLabels.length;
+  function setCamera(index) {
+    cameraIndex = index;
     snapCamera = true;
     return cameraLabels[cameraIndex];
   }
+
+  const cycleCamera = () => setCamera((cameraIndex + 1) % cameraLabels.length);
 
   function camera(ctx) {
     const { pos, yaw, air, float, pitch } = ctx.st, cam = ctx.cam;
@@ -361,6 +363,6 @@ const Ride = (() => {
     return { focus: ctx.cam.position.distanceTo(target), aperture: 0, lightFocus: ctx.st.pos, lightBox: 34, tod: 25, shafts: .3, lanGain: .3 };
   }
 
-  return { state, reset, goTo, setControl, clearControls, step, takeoff, land, camera, view, orbit, zoom, cycleCamera,
+  return { state, reset, goTo, setControl, clearControls, step, takeoff, land, camera, view, orbit, zoom, setCamera, cycleCamera,
     get cameraLabel() { return I18n.text(cameraLabels[cameraIndex]); } };
 })();

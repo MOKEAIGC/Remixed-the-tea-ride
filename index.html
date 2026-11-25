@@ -65,9 +65,11 @@ body.ride-active #hud{bottom:66px}
 .ride-panel-options button[aria-pressed=true]{background:#27384f;border-color:#27384f;color:#fff7e6}
 #ride-panel-body{min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 18px 18px;scrollbar-color:#798499 transparent}
 .ride-command-group+.ride-command-group{margin-top:15px}
-.ride-command-group h3{margin:0 0 6px;font-size:12px;font-weight:760;color:#3f5168}
+.ride-command-group h3,.ride-scene-group h3{margin:0 0 6px;font-size:12px;font-weight:760;color:#3f5168}
 .ride-command-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
-#ride-scene-list{display:grid;gap:6px}
+#ride-scene-list{display:grid;gap:15px}
+.ride-scene-group{display:grid;gap:6px}
+.ride-scene-group h3{margin-bottom:0}
 .ride-command{
   display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:4px 7px;min-height:41px;
   width:100%;padding:8px 9px;text-align:left;border-color:#95847068;background:#fff9eeaf;
@@ -91,6 +93,7 @@ body.ride-active #hud{bottom:66px}
   grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;align-items:center;
 }
 #ride-scene p{margin:3px 0 0;color:#495b70;font-size:11px}
+#ride-scene #ride-scene-cue{color:#263a56;font-weight:700}
 #ride-scene-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:5px}
 #ride-scene progress{grid-column:1/-1;width:100%;height:5px;accent-color:#a33226}
 #ride-touch{display:none;position:absolute;bottom:max(14px,env(safe-area-inset-bottom));left:14px;right:14px;align-items:flex-end;justify-content:space-between;gap:12px}
@@ -133,6 +136,7 @@ body.ride-active #hud{bottom:66px}
   <div id="ride-menu" role="group" aria-label="选择模式" data-en-label="Choose a mode" hidden>
     <button type="button" class="ride-button ride-button--primary" data-ride-mode="ride" data-en-text="Free Ride">自由骑行</button>
     <button type="button" class="ride-button" data-ride-mode="film" data-en-text="Watch Film">播放短片</button>
+    <button type="button" class="ride-button" data-ride-mode="demo" data-en-text="Gameplay Demo">游玩演示</button>
   </div>
 </div>
 <div id="hud"></div>
@@ -196,10 +200,10 @@ body.ride-active #hud{bottom:66px}
   </section>
 </div>
 <section id="ride-scene" class="ride-glass" aria-labelledby="ride-scene-title" hidden>
-  <div><h2 id="ride-scene-title">位点演出</h2><p id="ride-scene-detail" hidden></p></div>
+  <div><h2 id="ride-scene-title">位点演出</h2><p id="ride-scene-detail" hidden></p><p id="ride-scene-cue" hidden></p></div>
   <div id="ride-scene-actions">
     <button type="button" class="ride-button" data-language-toggle lang="en" title="Switch to English" aria-label="Switch to English">EN</button>
-    <button type="button" class="ride-button" data-ride-action="stopScene" aria-keyshortcuts="Escape"><span data-en-text="Back to Ride">返回骑行</span> <kbd class="ride-key" aria-hidden="true">Esc</kbd></button>
+    <button type="button" class="ride-button" data-ride-action="stopScene" aria-keyshortcuts="Escape"><span id="ride-scene-exit">返回骑行</span> <kbd class="ride-key" aria-hidden="true">Esc</kbd></button>
   </div>
   <progress id="ride-scene-progress" max="1" aria-label="演出进度" data-en-label="Scene progress" hidden></progress>
 </section>
@@ -5275,11 +5279,13 @@ const Ride = (() => {
 
   function zoom(delta) { distance = clamp(distance * Math.exp(delta * .001), 4.4, 13); }
 
-  function cycleCamera() {
-    cameraIndex = (cameraIndex + 1) % cameraLabels.length;
+  function setCamera(index) {
+    cameraIndex = index;
     snapCamera = true;
     return cameraLabels[cameraIndex];
   }
+
+  const cycleCamera = () => setCamera((cameraIndex + 1) % cameraLabels.length);
 
   function camera(ctx) {
     const { pos, yaw, air, float, pitch } = ctx.st, cam = ctx.cam;
@@ -5331,7 +5337,7 @@ const Ride = (() => {
     return { focus: ctx.cam.position.distanceTo(target), aperture: 0, lightFocus: ctx.st.pos, lightBox: 34, tod: 25, shafts: .3, lanGain: .3 };
   }
 
-  return { state, reset, goTo, setControl, clearControls, step, takeoff, land, camera, view, orbit, zoom, cycleCamera,
+  return { state, reset, goTo, setControl, clearControls, step, takeoff, land, camera, view, orbit, zoom, setCamera, cycleCamera,
     get cameraLabel() { return I18n.text(cameraLabels[cameraIndex]); } };
 })();
 
@@ -5400,6 +5406,118 @@ const RideTrail = (() => {
   }
 
   return { setActive, reset, update };
+})();
+
+// ===== 87_ride_replay.js =====
+
+
+// These beats drive the same controls and actions as a live ride.
+const RideReplay = (() => {
+  const market = [
+    [0, 'cue', ['W + Shift · 穿过集市', 'W + Shift · Sprint through the market']],
+    [0, 'control', 'forward', true],
+    [0, 'control', 'sprint', true],
+    [2.9, 'cue', ['Shift + F · 下起柠檬雨', 'Shift + F · Make it rain lemons']],
+    [2.9, 'lemonRain'],
+    [3.3, 'cameraMode', 2],
+    [4.95, 'control', 'forward', false],
+    [4.95, 'control', 'sprint', false],
+    [5, 'cameraMode', 0],
+  ];
+  const pier = [
+    [0, 'cue', ['G · 沿码头助跑起飞', 'G · Sprint off the pier']],
+    [0, 'pierCombo'],
+    [2.25, 'cameraMode', 2],
+    [2.25, 'orbit', 8, -24],
+    [3.93, 'cue', ['D · 侧倾掠过湖面', 'D · Bank over the lake']],
+    [3.93, 'control', 'right', true],
+    [4.77, 'control', 'right', false],
+  ];
+  const lanterns = [
+    [0, 'cue', ['J · 在月夜放飞孔明灯', 'J · Launch sky lanterns in the moonlight']],
+    [0, 'lanternCombo'],
+    [3.25, 'cameraMode', 0],
+    [3.25, 'cue', ['Shift + L · 再放一组孔明灯', 'Shift + L · Send up another wave']],
+    [3.25, 'lanterns'],
+  ];
+  const lake = [
+    [0, 'cue', ['K · 落水后停下来喝茶', 'K · Splash down for tea']],
+    [0, 'landingCombo'],
+    [2.2, 'cameraMode', 2],
+    [2.2, 'zoom', -240],
+  ];
+  const at = (time, beats) => beats.map(([delay, ...beat]) => [time + delay, ...beat]);
+
+  const scenes = [
+    {
+      id: 'gameplayTour', label: ['完整游玩演示', 'Full Gameplay Tour'],
+      detail: ['从集市冲刺、码头起飞，到夜航放灯和湖上喝茶。', 'Sprint through the market, take off from the pier, launch sky lanterns and land for tea.'],
+      key: '9', code: 'Digit9', duration: 24,
+      beats: [...market, ...at(5.15, pier), ...at(10.15, lanterns), ...at(16.35, lake)],
+    },
+    ...[
+      {
+        id: 'gameplayMarket', label: ['集市冲刺与柠檬雨', 'Market Sprint & Lemon Rain'],
+        detail: ['沿集市冲刺，用 Shift + F 让柠檬从天而降。', 'Dash through the market and use Shift + F to make it rain lemons.'],
+        duration: 5.3, beats: market,
+      },
+      {
+        id: 'gameplayPier', label: ['落日码头起飞', 'Sunset Pier Departure'],
+        detail: ['用 G 助跑起飞，随后按 D 侧倾转向。', 'Use G for a running takeoff, then bank with D.'],
+        duration: 5.1, beats: pier,
+      },
+      {
+        id: 'gameplayLanterns', label: ['夜航放飞孔明灯', 'Moonlit Lantern Flight'],
+        detail: ['从湖面起飞，穿过自己放飞的几组孔明灯。', 'Lift off from the lake and fly through waves of lanterns you release.'],
+        duration: 6.3, beats: [[0, 'pose', -102, -16, Math.PI * .64], ...lanterns],
+      },
+      {
+        id: 'gameplayLake', label: ['落湖喝茶', 'Splashdown & Tea'],
+        detail: ['在月夜飞行，从空中降落湖面，再举杯喝茶。', 'Fly by moonlight, touch down on the lake and enjoy a sip of tea.'],
+        duration: 9, beats: [
+          [0, 'cue', ['空格 · 从湖面起飞', 'Space · Take off from the lake']],
+          [0, 'pose', -112, -30, Math.PI * .65],
+          [0, 'time', 2],
+          [0, 'takeoff'],
+          [1.1, 'lanterns'],
+          ...at(2.25, lake),
+        ],
+      },
+    ].map((scene, index) => ({ ...scene, key: `Shift + ${index + 6}`, code: `Digit${index + 6}`, shift: true })),
+  ];
+
+  let active;
+
+  function start(scene, dispatch) {
+    if (!scenes.includes(scene)) return false;
+    active = { scene, dispatch, elapsed: 0, next: 0, cue: undefined, finished: false };
+    return true;
+  }
+
+  function step(dt) {
+    if (!active || active.finished || !Number.isFinite(dt) || dt < 0) return false;
+    const replay = active;
+    const { beats, duration } = replay.scene;
+    replay.elapsed = Math.min(replay.elapsed + dt, duration);
+    while (replay.next < beats.length && beats[replay.next][0] <= replay.elapsed + 1e-9) {
+      const [, action, ...args] = beats[replay.next++];
+      if (action === 'cue') replay.cue = args[0];
+      else replay.dispatch(action, ...args);
+      if (active !== replay) return false;
+    }
+    if (duration - replay.elapsed > 1e-9) return false;
+    replay.elapsed = duration;
+    replay.finished = true;
+    return true;
+  }
+
+  return {
+    scenes, start, step,
+    stop() { active = undefined; },
+    get progress() { return active ? active.elapsed / active.scene.duration : 0; },
+    get cue() { return active?.cue; },
+    get scene() { return active?.scene; },
+  };
 })();
 
 // ===== 87_ride_show.js =====
@@ -5471,6 +5589,7 @@ const RideShow = (() => {
   const styles = [['立体', '3D'], ['木版画', 'Woodblock']];
   let timeIndex = 0, time = times[0], print = false, printBlend = 0;
   function setTime(index) { timeIndex = index; }
+  function resetLook() { timeIndex = 0; time = times[0]; print = false; printBlend = 0; }
   function styleFrame(dt) {
     printBlend = damp(printBlend, Number(print), 6, dt);
     time = damp(time, times[timeIndex], 3.2, dt);
@@ -5536,7 +5655,7 @@ const RideShow = (() => {
   }
 
   return {
-    scenes, groups, actionFor, startCombo, stepCombo, cancelCombo, setTime, styleFrame,
+    scenes, groups, actionFor, startCombo, stepCombo, cancelCombo, resetLook, setTime, styleFrame,
     cycleTime() { setTime((timeIndex + 1) % times.length); return timeLabels[timeIndex]; },
     cycleStyle() { print = !print; return styles[Number(print)]; },
     view(ctx) { return { ...Ride.view(ctx), tod: time, lanGain: lerp(.35, 1.15, sm(55, 67, time)) }; },
@@ -5572,11 +5691,13 @@ const RideUI = (() => {
   const sceneOverlay = document.getElementById('ride-scene');
   const sceneTitle = document.getElementById('ride-scene-title');
   const sceneDetail = document.getElementById('ride-scene-detail');
+  const sceneCue = document.getElementById('ride-scene-cue');
+  const sceneExit = document.getElementById('ride-scene-exit');
   const sceneProgress = document.getElementById('ride-scene-progress');
   const holds = new Map();
   const languageButtons = document.querySelectorAll('[data-language-toggle]');
   const translations = [];
-  let onControl, returnFocus, currentScene;
+  let onControl, returnFocus, currentScene, currentMode;
 
   function bindText(element, value, attribute) {
     function translate() {
@@ -5667,7 +5788,7 @@ const RideUI = (() => {
     return button;
   }
 
-  function populate(groups, scenes) {
+  function populate(groups, scenes, replays) {
     for (const { label, actions } of groups) {
       const group = document.createElement('section');
       group.className = 'ride-command-group';
@@ -5679,8 +5800,19 @@ const RideUI = (() => {
       group.append(title, grid);
       actionList.append(group);
     }
-    sceneList.append(...scenes.map(makeCommand));
-    scenesTab.hidden = !scenes.length;
+    for (const [label, entries] of [
+      [['游玩演示', 'Gameplay Replays'], replays],
+      [['原片演出', 'Original Film'], scenes],
+    ]) {
+      if (!entries.length) continue;
+      const title = document.createElement('h3');
+      bindText(title, label);
+      const group = document.createElement('section');
+      group.className = 'ride-scene-group';
+      group.append(title, ...entries.map(makeCommand));
+      sceneList.append(group);
+    }
+    scenesTab.hidden = !scenes.length && !replays.length;
   }
 
   function showTab(scenes) {
@@ -5737,9 +5869,9 @@ const RideUI = (() => {
     });
   }
 
-  function install({ select, control, action, groups = [], scenes = [] }) {
+  function install({ select, control, action, groups = [], scenes = [], replays = [] }) {
     onControl = control;
-    populate(groups, scenes);
+    populate(groups, scenes, replays);
     panelToggle.addEventListener('click', togglePanel);
     panelClose.addEventListener('click', () => closePanel());
     actionsTab.addEventListener('click', () => showTab(false));
@@ -5765,11 +5897,13 @@ const RideUI = (() => {
 
   function setMode(mode) {
     releaseAll();
+    currentMode = mode;
     const riding = mode === 'ride';
     if (!riding) closePanel({ focus: false });
     overlay.hidden = !riding;
     filmEntry.hidden = filmLanguage.hidden = mode !== 'film';
-    sceneOverlay.hidden = mode !== 'scene';
+    sceneOverlay.hidden = mode !== 'scene' && mode !== 'demo';
+    if (!sceneOverlay.hidden) setScene(currentScene);
     document.body.classList.toggle('ride-active', riding);
   }
 
@@ -5779,10 +5913,13 @@ const RideUI = (() => {
 
   function setScene(scene) {
     currentScene = scene;
-    const { label, detail, progress: fraction } = scene || {};
+    const { label, detail, cue, progress: fraction, takeover = currentMode === 'demo' } = scene || {};
     renderText(sceneTitle, I18n.text(label || ['位点演出', 'Film Scene']));
     renderText(sceneDetail, detail ? I18n.text(detail) : '');
-    sceneDetail.hidden = !detail;
+    sceneDetail.hidden = !detail || Boolean(cue);
+    renderText(sceneCue, cue ? I18n.text(cue) : '');
+    sceneCue.hidden = !cue;
+    renderText(sceneExit, takeover ? I18n.t('接管骑行', 'Take Over') : I18n.t('返回骑行', 'Back to Ride'));
     sceneProgress.hidden = !Number.isFinite(fraction);
     if (!sceneProgress.hidden) sceneProgress.value = Math.max(0, Math.min(1, fraction));
   }
@@ -5913,7 +6050,7 @@ const Film = (() => {
 const Player = (() => {
   const cv = document.getElementById('c'), hud = document.getElementById('hud'); let base = 0, paused = false, pausedAt = 0, last = -1, lastNow = 0, running = false, hudT = 0; const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), P = { x: 0, y: 0, px: 0, py: 0, down: false, moved: 0, t: 0, id: -1, sx: 0, sy: 0 }, wp = V3(), wl = V3(), plane = new THREE.Plane(), nrm = V3(), tmp = V3(); let pinch = 0, ptrs = new Map();
   let mode = 'film', filmAt = 0, rideAt = 6, rideStarted = false, loader, chapter, savedFilmView;
-  const keyboard = new Set(), touch = new Set(), automatic = new Set();
+  const keyboard = new Set(), touch = new Set(), automatic = new Set(), replayControls = new Set();
   const rideKeys = {
     KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back',
     KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
@@ -5929,13 +6066,15 @@ const Player = (() => {
     hudT = setTimeout(() => { hud.style.opacity = 0; notice = undefined; }, ms);
   };
   const raw = () => paused ? pausedAt : Sound.on ? Sound.time() : (performance.now() - base) / 1000;         // runs on over loops
-  const clock = () => mode === 'scene' ? clamp(raw(), chapter.start, chapter.end) : mode === 'ride' ? Math.max(0, raw()) % Score.DUR : mod(raw(), Score.DUR);
+  const isRideWorld = () => mode === 'ride' || mode === 'demo';
+  const isScene = () => mode === 'scene' || mode === 'demo';
+  const clock = () => mode === 'scene' ? clamp(raw(), chapter.start, chapter.end) : isRideWorld() ? Math.max(0, raw()) % Score.DUR : mod(raw(), Score.DUR);
   function sound() {
     if (!running || paused || Sound.on || !Sound.ready || !Sound.open()) return;
     const requestedMode = mode;
     Sound.ctx.resume().then(() => {
       if (mode === requestedMode && !paused && !Sound.on && Sound.ctx.state === 'running') {
-        Sound.play(clock(), mode === 'ride');
+        Sound.play(clock(), isRideWorld());
       }
     }).catch(() => {});
   }
@@ -5943,12 +6082,12 @@ const Player = (() => {
     if (paused) {
       paused = false;
       base = performance.now() - pausedAt * 1000;
-      if (Sound.ctx && Sound.ready) Sound.ctx.resume().then(() => { if (!paused && !Sound.on) Sound.play(clock(), mode === 'ride'); }).catch(() => {});
+      sound();
     } else {
       pausedAt = clock();
       paused = true;
       Sound.stop();
-      if (mode === 'ride') { keyboard.clear(); touch.clear(); for (const name of Object.values(rideKeys)) syncControl(name); }
+      if (isRideWorld()) clearManualControls();
     }
   }
   // ---- live notes: what the world answers with
@@ -5981,7 +6120,14 @@ const Player = (() => {
   }
 
   function syncControl(name) {
-    Ride.setControl(name, automatic.has(name) || touch.has(name) || [...keyboard].some(code => rideKeys[code] === name));
+    Ride.setControl(name, replayControls.has(name) || automatic.has(name) || touch.has(name) || [...keyboard].some(code => rideKeys[code] === name));
+  }
+
+  function clearManualControls() {
+    const held = new Set([...touch, ...Array.from(keyboard, code => rideKeys[code])]);
+    keyboard.clear();
+    touch.clear();
+    for (const name of held) syncControl(name);
   }
 
   function clearControls() {
@@ -5989,6 +6135,7 @@ const Player = (() => {
     keyboard.clear();
     touch.clear();
     automatic.clear();
+    replayControls.clear();
     Ride.clearControls();
   }
 
@@ -5999,11 +6146,11 @@ const Player = (() => {
     syncControl(name);
   }
 
-  function resetRide() {
+  function resetRide(preserveTrail = false) {
     clearControls();
     Phys.bodies.length = 0;
     Ride.reset();
-    RideTrail.reset();
+    if (!preserveTrail) RideTrail.reset();
     Air.clearRideLanterns();
     Pelican.resetRideActions?.();
     Rider.resetRideActions?.();
@@ -6025,15 +6172,17 @@ const Player = (() => {
   }
 
   function rideAction(action, ...args) {
-    if (!running) return;
-    if (mode === 'scene' && action === 'stopScene') { select('ride'); return; }
+    if (!running || !action) return;
+    if (isScene() && action === 'stopScene') { select('ride'); return; }
+    const replay = RideReplay.scenes.find(item => item.id === action);
+    if (replay) { select('demo', true, replay); return; }
     const nextChapter = RideShow.scenes.find(item => item.id === action);
-    if (nextChapter && (mode === 'ride' || mode === 'scene')) { select('scene', true, nextChapter); return; }
-    if (mode !== 'ride') return;
+    if (nextChapter) { select('scene', true, nextChapter); return; }
+    if (!isRideWorld()) return;
     sound();
     const t = Main.ctx.t, rideTime = Ride.state.t;
     if (RideShow.startCombo(action, rideAction)) {
-      keyboard.clear(); touch.clear(); Ride.clearControls();
+      clearManualControls();
       RideUI.closePanel({ focus: false });
       return;
     }
@@ -6074,6 +6223,31 @@ const Player = (() => {
     }
   }
 
+  function replayAction(action, ...args) {
+    switch (action) {
+      case 'control': {
+        const [name, held] = args;
+        if (held) replayControls.add(name); else replayControls.delete(name);
+        syncControl(name);
+        break;
+      }
+      case 'pose':
+        if (Ride.goTo(...args)) {
+          for (const name of new Set([...automatic, ...replayControls])) syncControl(name);
+          last = -1;
+        }
+        break;
+      case 'cameraMode': Ride.setCamera(args[0]); break;
+      case 'orbit': Ride.orbit(...args); break;
+      case 'zoom': Ride.zoom(args[0]); break;
+      default: rideAction(action, ...args);
+    }
+  }
+
+  function replayShortcut(event) {
+    return RideReplay.scenes.find(item => item.code === event.code && Boolean(item.shift) === event.shiftKey)?.id;
+  }
+
   function toggleMute(ms) {
     Sound.mute(!Sound.muted);
     say(Sound.muted ? ['已静音', 'Muted'] : ['声音开启', 'Sound on'], ms);
@@ -6096,11 +6270,28 @@ const Player = (() => {
       if (!RideUI.closePanel()) rideAction('cancelCombo');
       return;
     }
-    const action = e.code === 'KeyH' ? 'panel' : RideShow.actionFor(e);
+    const action = e.code === 'KeyH' ? 'panel' : replayShortcut(e) || RideShow.actionFor(e);
     if (action) { e.preventDefault(); rideAction(action); }
   }
 
-  function keys(e) { if (!running || e.metaKey || e.ctrlKey || e.altKey) return; if (mode === 'ride') return rideKey(e); if (mode === 'scene') { if (e.repeat) return; if (e.code === 'Escape') select('ride'); else if (e.code === 'KeyM') toggleMute(1200); else if (e.code === 'Space' && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); toggle(); } else if (/^Digit[1-8]$/.test(e.code) && !e.shiftKey) rideAction(RideShow.actionFor(e)); return; } const k = e.key.toLowerCase(), ctx = Main.ctx, t = ctx.t; if (k === ' ' && e.target instanceof HTMLButtonElement) return; if (!Sound.on) sound(); const row = 'asdfghjkl;'.indexOf(k); if (row >= 0 && !e.repeat) { const sc = Score.scaleAt(t), m = sc[row % 5] + 12 * (1 + Math.floor(row / 5)); Score.live('koto', { t, m, r: clamp(Math.round((m - 50) / 4.2), 0, 7), v: .95 }); if (typeof Rider !== 'undefined' && Rider.drop) Rider.drop(row / 10, .5, .6); return; }
+  function sceneKey(e) {
+    if (e.repeat) return;
+    if (e.code === 'Escape') select('ride');
+    else if (e.code === 'KeyM') toggleMute(1200);
+    else if (e.code === 'Space' && !(e.target instanceof HTMLButtonElement)) {
+      e.preventDefault();
+      toggle();
+    } else {
+      const action = replayShortcut(e) || (!e.shiftKey && /^Digit[1-8]$/.test(e.code) && RideShow.actionFor(e));
+      if (action) { e.preventDefault(); rideAction(action); }
+    }
+  }
+
+  function keys(e) {
+    if (!running || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (mode === 'ride') return rideKey(e);
+    if (isScene()) return sceneKey(e);
+    const k = e.key.toLowerCase(), ctx = Main.ctx, t = ctx.t; if (k === ' ' && e.target instanceof HTMLButtonElement) return; if (!Sound.on) sound(); const row = 'asdfghjkl;'.indexOf(k); if (row >= 0 && !e.repeat) { const sc = Score.scaleAt(t), m = sc[row % 5] + 12 * (1 + Math.floor(row / 5)); Score.live('koto', { t, m, r: clamp(Math.round((m - 50) / 4.2), 0, 7), v: .95 }); if (typeof Rider !== 'undefined' && Rider.drop) Rider.drop(row / 10, .5, .6); return; }
     if (k === ' ') { e.preventDefault(); toggle(); } else if (k === 'n') Strip.toggle(); else if (k === 'q') { if (typeof Pelican !== 'undefined' && Pelican.honk) Pelican.honk(t); Sound.hit('honk', { v: .75 }); } else if (k === 'w') { if (typeof Rider !== 'undefined' && Rider.sip) Rider.sip(t); Sound.hit('slurp', { v: .5, delay: .62 }); } else if (k === 'e') { for (let i = 0; i < 10; i++) Phys.add({ x: ctx.st.pos.x - 1.2 - Math.random() * 3, y: ctx.st.pos.y + 5 + Math.random() * 2.5, z: ctx.st.pos.z - 2.6 + Math.random() * 4, vx: ctx.st.vel.x, vy: 0, vz: ctx.st.vel.z, live: true, r: .085 }); } else if (k === 'b') Score.live('taiko', { t, v: 1, sz: 1 }); else if (k === 'p') { Film.printLock = Film.printLock === undefined ? 1 : undefined; } else if (k === 'r') { Film.free.tride = Film.free.tride ? 0 : 1; } else if (k === 'm') toggleMute(1200); else if (k === 'x') fullscreen(); else if (k === '?' || k === '/') say(HELP, 8000); else if (k === 'arrowright' || k === 'arrowleft') seek((((raw() % Score.DUR) + (k === 'arrowright' ? 4.8 : -4.8)) + Score.DUR) % Score.DUR); }
   function seek(t) { base = performance.now() - t * 1000; if (paused) pausedAt = t; if (Sound.on) Sound.play(t); last = -1; }
   const HELP = [
@@ -6108,7 +6299,7 @@ const Player = (() => {
     'Click an object to play it · click empty space to throw a lemon · drag to look · scroll to zoom · A through ; koto · B drum · Q honk · W sip · E lemon rain · R rider view · P woodblock · N score · Space pause · M mute · X full screen',
   ];
   function orbit(dx, dy) {
-    if (mode === 'ride') Ride.orbit(dx, dy);
+    if (isRideWorld()) Ride.orbit(dx, dy);
     else {
       Film.free.tyaw -= dx * .0052;
       Film.free.tpitch = clamp(Film.free.tpitch + dy * .0036, -.9, 1.1);
@@ -6117,7 +6308,7 @@ const Player = (() => {
   }
 
   function zoom(delta, held) {
-    if (mode === 'ride') Ride.zoom(delta);
+    if (isRideWorld()) Ride.zoom(delta);
     else {
       Film.free.tzoom = clamp(Film.free.tzoom * Math.exp(delta * .0011), held ? .45 : .4, held ? 2.2 : 2.4);
       Film.free.hold = 3.2;
@@ -6127,14 +6318,14 @@ const Player = (() => {
   function events() {
     const opt = { passive: false }; cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); P.down = true; P.moved = 0; P.sx = P.px = e.clientX; P.sy = P.py = e.clientY; P.t = performance.now(); if (!Sound.on) { sound(); } });
     cv.addEventListener('pointermove', e => { const now = performance.now(), dt = (now - (P.lt || now)) / 1000; P.lt = now; gust(e.clientX, e.clientY, dt); if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, [e.clientX, e.clientY]); if (ptrs.size === 2) { const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch && d > 0) zoom(Math.log(pinch / d) / .0011, true); pinch = d; P.moved = 99; return; } if (P.down) { const dx = e.clientX - P.px, dy = e.clientY - P.py; P.moved += Math.abs(dx) + Math.abs(dy); if (P.moved > 8) { orbit(dx, dy); cv.style.cursor = 'grabbing'; } } P.px = e.clientX; P.py = e.clientY; });
-    const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = 0; if (running && P.down && P.moved <= 8 && e.type === 'pointerup') poke(e.clientX, e.clientY); P.down = false; cv.style.cursor = 'grab'; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('wheel', e => { if (running) { e.preventDefault(); zoom(e.deltaY, false); } }, opt);
+    const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = 0; if (running && mode !== 'demo' && P.down && P.moved <= 8 && e.type === 'pointerup') poke(e.clientX, e.clientY); P.down = false; cv.style.cursor = 'grab'; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('wheel', e => { if (running) { e.preventDefault(); zoom(e.deltaY, false); } }, opt);
     addEventListener('keydown', keys);
     addEventListener('keyup', e => { if (keyboard.delete(e.code)) syncControl(rideKeys[e.code]); });
-    addEventListener('blur', clearControls);
+    addEventListener('blur', () => { if (mode === 'demo') clearManualControls(); else clearControls(); });
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) clearControls();
+      if (document.hidden && mode !== 'demo') clearControls();
       if (mode === 'ride') return;
-      if (document.hidden && Sound.on && !paused) { P.auto = true; toggle(); }
+      if (document.hidden && (mode === 'demo' || Sound.on) && !paused) { P.auto = true; toggle(); }
       else if (!document.hidden && P.auto) { P.auto = false; if (paused) toggle(); }
     });
   }
@@ -6145,9 +6336,14 @@ const Player = (() => {
     if (P.vx !== undefined) { const k = Math.exp(-5 * (now - lastNow) / 1000); P.vx *= k; P.vy *= k; P.vz *= k; Wind.wake(1, wp.x, wp.y, wp.z, 1.7, P.vx, P.vy, P.vz, .16); }
     const ms = now - lastNow; lastNow = now; Sound.tick(); G.t = t;
     if (loop) Score.clearLive();
-    if (mode === 'ride') {
+    let replayDone = false;
+    if (isRideWorld()) {
       const dt = paused ? 0 : clamp(ms / 1000, 0, .05);
-      if (!paused) RideShow.stepCombo(dt);
+      if (mode === 'demo' && !Main.ctx.freeRide) Main.update(t, 0, true, true);
+      if (!paused) {
+        if (mode === 'demo') replayDone = RideReplay.step(dt);
+        RideShow.stepCombo(dt);
+      }
       const step = Math.floor(Ride.state.phase);
       const landed = Ride.state.touchdown;
       if (!paused || last < 0) Main.update(t, dt, jump || last < 0, true);
@@ -6156,11 +6352,13 @@ const Player = (() => {
       if ((motion === 'walk' || motion === 'run') && Math.floor(phase) > step && speed > .35) {
         Sound.hit(pos.x < -74 ? 'plank' + Math.floor(phase) % 4 : 'hoof', { v: .35 });
       }
-      const height = Math.round(Ride.state.altitude);
-      const flight = motion === 'fly' ? I18n.t(`飞行 ${height} 米`, `Flying · ${height} m`) :
-        motion === 'float' ? I18n.t('水面漂浮', 'On the water') : I18n.t('地面骑行', 'On the ground');
-      const status = paused ? I18n.t('已暂停', 'Paused') : landing ? I18n.t('正在降落', 'Landing') : flight;
-      RideUI.update({ ...RideTrail.update(Main.ctx), status, style: RideShow.label, camera: Ride.cameraLabel, scene: RideShow.combo });
+      if (mode === 'ride') {
+        const height = Math.round(Ride.state.altitude);
+        const flight = motion === 'fly' ? I18n.t(`飞行 ${height} 米`, `Flying · ${height} m`) :
+          motion === 'float' ? I18n.t('水面漂浮', 'On the water') : I18n.t('地面骑行', 'On the ground');
+        const status = paused ? I18n.t('已暂停', 'Paused') : landing ? I18n.t('正在降落', 'Landing') : flight;
+        RideUI.update({ ...RideTrail.update(Main.ctx), status, style: RideShow.label, camera: Ride.cameraLabel, scene: RideShow.combo });
+      }
     } else if (jump) Main.update(t, 1 / 60, true);
     else if (dtR > 0 || paused) {
       const dt = clamp(dtR, 0, .1);
@@ -6171,18 +6369,21 @@ const Player = (() => {
     }
     last = t;
     Main.draw();
-    if (mode !== 'scene') Strip.draw(t);
-    else {
+    if (mode === 'demo') {
+      RideUI.setScene({ ...chapter, progress: RideReplay.progress, cue: RideReplay.cue, takeover: true });
+      if (replayDone) select('ride');
+    } else if (mode === 'scene') {
       RideUI.setScene({ ...chapter, progress: (t - chapter.start) / (chapter.end - chapter.start) });
       if (t >= chapter.end) select('ride');
-    }
+    } else Strip.draw(t);
     if (ms < 100) govern(ms, now); window.__fps = 1000 / ema;
   }
 
   function select(next, withSound = true, scene) {
-    if (running && next === mode && mode !== 'scene') return;
+    if (running && next === mode && !isScene()) return;
+    const takeover = mode === 'demo' && next === 'ride';
     if (running) {
-      if (mode === 'ride') rideAt = clock();
+      if (isRideWorld()) rideAt = clock();
       else if (mode === 'film') filmAt = clock();
     }
     if (next === 'scene') {
@@ -6194,23 +6395,33 @@ const Player = (() => {
       Film.printLock = savedFilmView.printLock;
       savedFilmView = undefined;
     }
-    Sound.stop();
-    Phys.bodies.length = 0;
-    Score.clearLive();
+    if (mode === 'demo') RideReplay.stop();
+    if (takeover) {
+      if (Ride.state.landing) Ride.takeoff();
+    } else {
+      Sound.stop();
+      Phys.bodies.length = 0;
+      Score.clearLive();
+    }
     clearControls();
     paused = P.auto = false;
     mode = next;
-    chapter = scene;
-    if (mode === 'ride' && !rideStarted) { resetRide(); rideStarted = true; }
+    chapter = mode === 'demo' ? scene || RideReplay.scenes[0] : scene;
+    if (mode === 'demo') {
+      resetRide(true);
+      RideShow.resetLook();
+      RideReplay.start(chapter, replayAction);
+      rideStarted = true;
+    } else if (mode === 'ride' && !rideStarted) { resetRide(); rideStarted = true; }
     if (Strip.on) Strip.toggle();
     RideTrail.setActive(Main.scene, mode === 'ride');
     RideUI.setMode(mode);
-    RideUI.setScene(chapter ? { ...chapter, progress: 0 } : null);
+    RideUI.setScene(chapter ? { ...chapter, progress: 0, takeover: mode === 'demo' } : null);
     hud.style.opacity = 0;
     notice = undefined;
-    last = -1;
+    if (!takeover) last = -1;
     lastNow = performance.now();
-    const startAt = mode === 'scene' ? chapter.start : mode === 'ride' ? rideAt : filmAt;
+    const startAt = mode === 'scene' ? chapter.start : mode === 'demo' ? 6 : mode === 'ride' ? rideAt : filmAt;
     base = lastNow - startAt * 1000;
     if (!running) {
       if (loader) {
@@ -6229,7 +6440,7 @@ const Player = (() => {
     loader = ld;
     const preparing = Sound.prepare();
     events();
-    RideUI.install({ select, control: touchControl, action: rideAction, groups: RideShow.groups, scenes: RideShow.scenes });
+    RideUI.install({ select, control: touchControl, action: rideAction, groups: RideShow.groups, scenes: RideShow.scenes, replays: RideReplay.scenes });
     const stt = document.getElementById('st'), bar = document.getElementById('bar'); if (bar) bar.style.opacity = 0;
     Main.update(0, 1 / 60, true); Main.draw(); Main.draw(); // compile what the first frames need
     for (const t of [3, 8, 22, 27, 33, 47, 55, 63, 70, 73, 77]) { Main.update(t, 1 / 60, true); Main.draw(); await new Promise(r => setTimeout(r, 0)); }
@@ -6238,7 +6449,8 @@ const Player = (() => {
     const stopTuning = I18n.subscribe(showTuning);
     await preparing;
     stopTuning();
-    if (Q.has('ride')) select('ride', false);
+    if (Q.has('demo')) select('demo', false);
+    else if (Q.has('ride')) select('ride', false);
     else if (Q.has('auto')) select('film', false);
     else RideUI.ready();
   }

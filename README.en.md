@@ -18,7 +18,7 @@ It opens on a flat woodblock print. The colour blocks go down on four clacks, th
 
 ## Play or watch
 
-Download or clone the repository and open the local `index.html` in a browser with WebGL 2. Pick **自由骑行** (Free ride) to explore the market, pier and lake, or **播放短片** (Play film) to watch the original film.
+Download or clone the repository and open the local `index.html` in a browser with WebGL 2. Choose **Free Ride**, **Gameplay Demo**, or **Watch Film**. In Chinese these are **自由骑行**, **游玩演示**, and **播放短片**.
 
 The interface starts in Simplified Chinese. Select **English** on the start screen or use the language button during play.
 
@@ -49,6 +49,18 @@ Press `H` or click **控制台** (Control panel) to open the mouse and touch con
 | `1`–`8` | Play the original opening, market, tea break, lemon chase, pier takeoff, lantern flight, lake landing or printed ending |
 
 The original film sequences return you to your playing position when they end. You can return early with `Esc` or the banner button. Steering or pressing `Esc` cancels a live action combination.
+
+#### Gameplay Replays
+
+In Free Ride, open **Controls → Film Scenes → Gameplay Replays**. Each replay runs in the game world and shows its current input on the banner. Press `Esc` or choose **Take Over** to resume control at the replay's current position. Control also returns automatically at the end.
+
+| Shortcut | Replay |
+|---|---|
+| `9` | Full route, from the market to tea on the lake |
+| `Shift+6` | Market sprint and lemon rain |
+| `Shift+7` | Sunset takeoff from the pier |
+| `Shift+8` | Night flight and sky lanterns |
+| `Shift+9` | Splashdown and tea |
 
 Ride through the three gold markers to check in at the market entrance, the tea stalls and the pier. Touch controls are available on touch screens. Add `?ride` to the local URL to open the game directly.
 

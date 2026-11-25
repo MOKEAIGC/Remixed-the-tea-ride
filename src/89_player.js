@@ -3,7 +3,7 @@
 const Player = (() => {
   const cv = document.getElementById('c'), hud = document.getElementById('hud'); let base = 0, paused = false, pausedAt = 0, last = -1, lastNow = 0, running = false, hudT = 0; const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), P = { x: 0, y: 0, px: 0, py: 0, down: false, moved: 0, t: 0, id: -1, sx: 0, sy: 0 }, wp = V3(), wl = V3(), plane = new THREE.Plane(), nrm = V3(), tmp = V3(); let pinch = 0, ptrs = new Map();
   let mode = 'film', filmAt = 0, rideAt = 6, rideStarted = false, loader, chapter, savedFilmView;
-  const keyboard = new Set(), touch = new Set(), automatic = new Set();
+  const keyboard = new Set(), touch = new Set(), automatic = new Set(), replayControls = new Set();
   const rideKeys = {
     KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back',
     KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
@@ -19,13 +19,15 @@ const Player = (() => {
     hudT = setTimeout(() => { hud.style.opacity = 0; notice = undefined; }, ms);
   };
   const raw = () => paused ? pausedAt : Sound.on ? Sound.time() : (performance.now() - base) / 1000;         // runs on over loops
-  const clock = () => mode === 'scene' ? clamp(raw(), chapter.start, chapter.end) : mode === 'ride' ? Math.max(0, raw()) % Score.DUR : mod(raw(), Score.DUR);
+  const isRideWorld = () => mode === 'ride' || mode === 'demo';
+  const isScene = () => mode === 'scene' || mode === 'demo';
+  const clock = () => mode === 'scene' ? clamp(raw(), chapter.start, chapter.end) : isRideWorld() ? Math.max(0, raw()) % Score.DUR : mod(raw(), Score.DUR);
   function sound() {
     if (!running || paused || Sound.on || !Sound.ready || !Sound.open()) return;
     const requestedMode = mode;
     Sound.ctx.resume().then(() => {
       if (mode === requestedMode && !paused && !Sound.on && Sound.ctx.state === 'running') {
-        Sound.play(clock(), mode === 'ride');
+        Sound.play(clock(), isRideWorld());
       }
     }).catch(() => {});
   }
@@ -33,12 +35,12 @@ const Player = (() => {
     if (paused) {
       paused = false;
       base = performance.now() - pausedAt * 1000;
-      if (Sound.ctx && Sound.ready) Sound.ctx.resume().then(() => { if (!paused && !Sound.on) Sound.play(clock(), mode === 'ride'); }).catch(() => {});
+      sound();
     } else {
       pausedAt = clock();
       paused = true;
       Sound.stop();
-      if (mode === 'ride') { keyboard.clear(); touch.clear(); for (const name of Object.values(rideKeys)) syncControl(name); }
+      if (isRideWorld()) clearManualControls();
     }
   }
   // ---- live notes: what the world answers with
@@ -71,7 +73,14 @@ const Player = (() => {
   }
 
   function syncControl(name) {
-    Ride.setControl(name, automatic.has(name) || touch.has(name) || [...keyboard].some(code => rideKeys[code] === name));
+    Ride.setControl(name, replayControls.has(name) || automatic.has(name) || touch.has(name) || [...keyboard].some(code => rideKeys[code] === name));
+  }
+
+  function clearManualControls() {
+    const held = new Set([...touch, ...Array.from(keyboard, code => rideKeys[code])]);
+    keyboard.clear();
+    touch.clear();
+    for (const name of held) syncControl(name);
   }
 
   function clearControls() {
@@ -79,6 +88,7 @@ const Player = (() => {
     keyboard.clear();
     touch.clear();
     automatic.clear();
+    replayControls.clear();
     Ride.clearControls();
   }
 
@@ -89,11 +99,11 @@ const Player = (() => {
     syncControl(name);
   }
 
-  function resetRide() {
+  function resetRide(preserveTrail = false) {
     clearControls();
     Phys.bodies.length = 0;
     Ride.reset();
-    RideTrail.reset();
+    if (!preserveTrail) RideTrail.reset();
     Air.clearRideLanterns();
     Pelican.resetRideActions?.();
     Rider.resetRideActions?.();
@@ -115,15 +125,17 @@ const Player = (() => {
   }
 
   function rideAction(action, ...args) {
-    if (!running) return;
-    if (mode === 'scene' && action === 'stopScene') { select('ride'); return; }
+    if (!running || !action) return;
+    if (isScene() && action === 'stopScene') { select('ride'); return; }
+    const replay = RideReplay.scenes.find(item => item.id === action);
+    if (replay) { select('demo', true, replay); return; }
     const nextChapter = RideShow.scenes.find(item => item.id === action);
-    if (nextChapter && (mode === 'ride' || mode === 'scene')) { select('scene', true, nextChapter); return; }
-    if (mode !== 'ride') return;
+    if (nextChapter) { select('scene', true, nextChapter); return; }
+    if (!isRideWorld()) return;
     sound();
     const t = Main.ctx.t, rideTime = Ride.state.t;
     if (RideShow.startCombo(action, rideAction)) {
-      keyboard.clear(); touch.clear(); Ride.clearControls();
+      clearManualControls();
       RideUI.closePanel({ focus: false });
       return;
     }
@@ -164,6 +176,31 @@ const Player = (() => {
     }
   }
 
+  function replayAction(action, ...args) {
+    switch (action) {
+      case 'control': {
+        const [name, held] = args;
+        if (held) replayControls.add(name); else replayControls.delete(name);
+        syncControl(name);
+        break;
+      }
+      case 'pose':
+        if (Ride.goTo(...args)) {
+          for (const name of new Set([...automatic, ...replayControls])) syncControl(name);
+          last = -1;
+        }
+        break;
+      case 'cameraMode': Ride.setCamera(args[0]); break;
+      case 'orbit': Ride.orbit(...args); break;
+      case 'zoom': Ride.zoom(args[0]); break;
+      default: rideAction(action, ...args);
+    }
+  }
+
+  function replayShortcut(event) {
+    return RideReplay.scenes.find(item => item.code === event.code && Boolean(item.shift) === event.shiftKey)?.id;
+  }
+
   function toggleMute(ms) {
     Sound.mute(!Sound.muted);
     say(Sound.muted ? ['已静音', 'Muted'] : ['声音开启', 'Sound on'], ms);
@@ -186,11 +223,28 @@ const Player = (() => {
       if (!RideUI.closePanel()) rideAction('cancelCombo');
       return;
     }
-    const action = e.code === 'KeyH' ? 'panel' : RideShow.actionFor(e);
+    const action = e.code === 'KeyH' ? 'panel' : replayShortcut(e) || RideShow.actionFor(e);
     if (action) { e.preventDefault(); rideAction(action); }
   }
 
-  function keys(e) { if (!running || e.metaKey || e.ctrlKey || e.altKey) return; if (mode === 'ride') return rideKey(e); if (mode === 'scene') { if (e.repeat) return; if (e.code === 'Escape') select('ride'); else if (e.code === 'KeyM') toggleMute(1200); else if (e.code === 'Space' && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); toggle(); } else if (/^Digit[1-8]$/.test(e.code) && !e.shiftKey) rideAction(RideShow.actionFor(e)); return; } const k = e.key.toLowerCase(), ctx = Main.ctx, t = ctx.t; if (k === ' ' && e.target instanceof HTMLButtonElement) return; if (!Sound.on) sound(); const row = 'asdfghjkl;'.indexOf(k); if (row >= 0 && !e.repeat) { const sc = Score.scaleAt(t), m = sc[row % 5] + 12 * (1 + Math.floor(row / 5)); Score.live('koto', { t, m, r: clamp(Math.round((m - 50) / 4.2), 0, 7), v: .95 }); if (typeof Rider !== 'undefined' && Rider.drop) Rider.drop(row / 10, .5, .6); return; }
+  function sceneKey(e) {
+    if (e.repeat) return;
+    if (e.code === 'Escape') select('ride');
+    else if (e.code === 'KeyM') toggleMute(1200);
+    else if (e.code === 'Space' && !(e.target instanceof HTMLButtonElement)) {
+      e.preventDefault();
+      toggle();
+    } else {
+      const action = replayShortcut(e) || (!e.shiftKey && /^Digit[1-8]$/.test(e.code) && RideShow.actionFor(e));
+      if (action) { e.preventDefault(); rideAction(action); }
+    }
+  }
+
+  function keys(e) {
+    if (!running || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (mode === 'ride') return rideKey(e);
+    if (isScene()) return sceneKey(e);
+    const k = e.key.toLowerCase(), ctx = Main.ctx, t = ctx.t; if (k === ' ' && e.target instanceof HTMLButtonElement) return; if (!Sound.on) sound(); const row = 'asdfghjkl;'.indexOf(k); if (row >= 0 && !e.repeat) { const sc = Score.scaleAt(t), m = sc[row % 5] + 12 * (1 + Math.floor(row / 5)); Score.live('koto', { t, m, r: clamp(Math.round((m - 50) / 4.2), 0, 7), v: .95 }); if (typeof Rider !== 'undefined' && Rider.drop) Rider.drop(row / 10, .5, .6); return; }
     if (k === ' ') { e.preventDefault(); toggle(); } else if (k === 'n') Strip.toggle(); else if (k === 'q') { if (typeof Pelican !== 'undefined' && Pelican.honk) Pelican.honk(t); Sound.hit('honk', { v: .75 }); } else if (k === 'w') { if (typeof Rider !== 'undefined' && Rider.sip) Rider.sip(t); Sound.hit('slurp', { v: .5, delay: .62 }); } else if (k === 'e') { for (let i = 0; i < 10; i++) Phys.add({ x: ctx.st.pos.x - 1.2 - Math.random() * 3, y: ctx.st.pos.y + 5 + Math.random() * 2.5, z: ctx.st.pos.z - 2.6 + Math.random() * 4, vx: ctx.st.vel.x, vy: 0, vz: ctx.st.vel.z, live: true, r: .085 }); } else if (k === 'b') Score.live('taiko', { t, v: 1, sz: 1 }); else if (k === 'p') { Film.printLock = Film.printLock === undefined ? 1 : undefined; } else if (k === 'r') { Film.free.tride = Film.free.tride ? 0 : 1; } else if (k === 'm') toggleMute(1200); else if (k === 'x') fullscreen(); else if (k === '?' || k === '/') say(HELP, 8000); else if (k === 'arrowright' || k === 'arrowleft') seek((((raw() % Score.DUR) + (k === 'arrowright' ? 4.8 : -4.8)) + Score.DUR) % Score.DUR); }
   function seek(t) { base = performance.now() - t * 1000; if (paused) pausedAt = t; if (Sound.on) Sound.play(t); last = -1; }
   const HELP = [
@@ -198,7 +252,7 @@ const Player = (() => {
     'Click an object to play it · click empty space to throw a lemon · drag to look · scroll to zoom · A through ; koto · B drum · Q honk · W sip · E lemon rain · R rider view · P woodblock · N score · Space pause · M mute · X full screen',
   ];
   function orbit(dx, dy) {
-    if (mode === 'ride') Ride.orbit(dx, dy);
+    if (isRideWorld()) Ride.orbit(dx, dy);
     else {
       Film.free.tyaw -= dx * .0052;
       Film.free.tpitch = clamp(Film.free.tpitch + dy * .0036, -.9, 1.1);
@@ -207,7 +261,7 @@ const Player = (() => {
   }
 
   function zoom(delta, held) {
-    if (mode === 'ride') Ride.zoom(delta);
+    if (isRideWorld()) Ride.zoom(delta);
     else {
       Film.free.tzoom = clamp(Film.free.tzoom * Math.exp(delta * .0011), held ? .45 : .4, held ? 2.2 : 2.4);
       Film.free.hold = 3.2;
@@ -217,14 +271,14 @@ const Player = (() => {
   function events() {
     const opt = { passive: false }; cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); P.down = true; P.moved = 0; P.sx = P.px = e.clientX; P.sy = P.py = e.clientY; P.t = performance.now(); if (!Sound.on) { sound(); } });
     cv.addEventListener('pointermove', e => { const now = performance.now(), dt = (now - (P.lt || now)) / 1000; P.lt = now; gust(e.clientX, e.clientY, dt); if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, [e.clientX, e.clientY]); if (ptrs.size === 2) { const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch && d > 0) zoom(Math.log(pinch / d) / .0011, true); pinch = d; P.moved = 99; return; } if (P.down) { const dx = e.clientX - P.px, dy = e.clientY - P.py; P.moved += Math.abs(dx) + Math.abs(dy); if (P.moved > 8) { orbit(dx, dy); cv.style.cursor = 'grabbing'; } } P.px = e.clientX; P.py = e.clientY; });
-    const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = 0; if (running && P.down && P.moved <= 8 && e.type === 'pointerup') poke(e.clientX, e.clientY); P.down = false; cv.style.cursor = 'grab'; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('wheel', e => { if (running) { e.preventDefault(); zoom(e.deltaY, false); } }, opt);
+    const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = 0; if (running && mode !== 'demo' && P.down && P.moved <= 8 && e.type === 'pointerup') poke(e.clientX, e.clientY); P.down = false; cv.style.cursor = 'grab'; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('wheel', e => { if (running) { e.preventDefault(); zoom(e.deltaY, false); } }, opt);
     addEventListener('keydown', keys);
     addEventListener('keyup', e => { if (keyboard.delete(e.code)) syncControl(rideKeys[e.code]); });
-    addEventListener('blur', clearControls);
+    addEventListener('blur', () => { if (mode === 'demo') clearManualControls(); else clearControls(); });
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) clearControls();
+      if (document.hidden && mode !== 'demo') clearControls();
       if (mode === 'ride') return;
-      if (document.hidden && Sound.on && !paused) { P.auto = true; toggle(); }
+      if (document.hidden && (mode === 'demo' || Sound.on) && !paused) { P.auto = true; toggle(); }
       else if (!document.hidden && P.auto) { P.auto = false; if (paused) toggle(); }
     });
   }
@@ -235,9 +289,14 @@ const Player = (() => {
     if (P.vx !== undefined) { const k = Math.exp(-5 * (now - lastNow) / 1000); P.vx *= k; P.vy *= k; P.vz *= k; Wind.wake(1, wp.x, wp.y, wp.z, 1.7, P.vx, P.vy, P.vz, .16); }
     const ms = now - lastNow; lastNow = now; Sound.tick(); G.t = t;
     if (loop) Score.clearLive();
-    if (mode === 'ride') {
+    let replayDone = false;
+    if (isRideWorld()) {
       const dt = paused ? 0 : clamp(ms / 1000, 0, .05);
-      if (!paused) RideShow.stepCombo(dt);
+      if (mode === 'demo' && !Main.ctx.freeRide) Main.update(t, 0, true, true);
+      if (!paused) {
+        if (mode === 'demo') replayDone = RideReplay.step(dt);
+        RideShow.stepCombo(dt);
+      }
       const step = Math.floor(Ride.state.phase);
       const landed = Ride.state.touchdown;
       if (!paused || last < 0) Main.update(t, dt, jump || last < 0, true);
@@ -246,11 +305,13 @@ const Player = (() => {
       if ((motion === 'walk' || motion === 'run') && Math.floor(phase) > step && speed > .35) {
         Sound.hit(pos.x < -74 ? 'plank' + Math.floor(phase) % 4 : 'hoof', { v: .35 });
       }
-      const height = Math.round(Ride.state.altitude);
-      const flight = motion === 'fly' ? I18n.t(`飞行 ${height} 米`, `Flying · ${height} m`) :
-        motion === 'float' ? I18n.t('水面漂浮', 'On the water') : I18n.t('地面骑行', 'On the ground');
-      const status = paused ? I18n.t('已暂停', 'Paused') : landing ? I18n.t('正在降落', 'Landing') : flight;
-      RideUI.update({ ...RideTrail.update(Main.ctx), status, style: RideShow.label, camera: Ride.cameraLabel, scene: RideShow.combo });
+      if (mode === 'ride') {
+        const height = Math.round(Ride.state.altitude);
+        const flight = motion === 'fly' ? I18n.t(`飞行 ${height} 米`, `Flying · ${height} m`) :
+          motion === 'float' ? I18n.t('水面漂浮', 'On the water') : I18n.t('地面骑行', 'On the ground');
+        const status = paused ? I18n.t('已暂停', 'Paused') : landing ? I18n.t('正在降落', 'Landing') : flight;
+        RideUI.update({ ...RideTrail.update(Main.ctx), status, style: RideShow.label, camera: Ride.cameraLabel, scene: RideShow.combo });
+      }
     } else if (jump) Main.update(t, 1 / 60, true);
     else if (dtR > 0 || paused) {
       const dt = clamp(dtR, 0, .1);
@@ -261,18 +322,21 @@ const Player = (() => {
     }
     last = t;
     Main.draw();
-    if (mode !== 'scene') Strip.draw(t);
-    else {
+    if (mode === 'demo') {
+      RideUI.setScene({ ...chapter, progress: RideReplay.progress, cue: RideReplay.cue, takeover: true });
+      if (replayDone) select('ride');
+    } else if (mode === 'scene') {
       RideUI.setScene({ ...chapter, progress: (t - chapter.start) / (chapter.end - chapter.start) });
       if (t >= chapter.end) select('ride');
-    }
+    } else Strip.draw(t);
     if (ms < 100) govern(ms, now); window.__fps = 1000 / ema;
   }
 
   function select(next, withSound = true, scene) {
-    if (running && next === mode && mode !== 'scene') return;
+    if (running && next === mode && !isScene()) return;
+    const takeover = mode === 'demo' && next === 'ride';
     if (running) {
-      if (mode === 'ride') rideAt = clock();
+      if (isRideWorld()) rideAt = clock();
       else if (mode === 'film') filmAt = clock();
     }
     if (next === 'scene') {
@@ -284,23 +348,33 @@ const Player = (() => {
       Film.printLock = savedFilmView.printLock;
       savedFilmView = undefined;
     }
-    Sound.stop();
-    Phys.bodies.length = 0;
-    Score.clearLive();
+    if (mode === 'demo') RideReplay.stop();
+    if (takeover) {
+      if (Ride.state.landing) Ride.takeoff();
+    } else {
+      Sound.stop();
+      Phys.bodies.length = 0;
+      Score.clearLive();
+    }
     clearControls();
     paused = P.auto = false;
     mode = next;
-    chapter = scene;
-    if (mode === 'ride' && !rideStarted) { resetRide(); rideStarted = true; }
+    chapter = mode === 'demo' ? scene || RideReplay.scenes[0] : scene;
+    if (mode === 'demo') {
+      resetRide(true);
+      RideShow.resetLook();
+      RideReplay.start(chapter, replayAction);
+      rideStarted = true;
+    } else if (mode === 'ride' && !rideStarted) { resetRide(); rideStarted = true; }
     if (Strip.on) Strip.toggle();
     RideTrail.setActive(Main.scene, mode === 'ride');
     RideUI.setMode(mode);
-    RideUI.setScene(chapter ? { ...chapter, progress: 0 } : null);
+    RideUI.setScene(chapter ? { ...chapter, progress: 0, takeover: mode === 'demo' } : null);
     hud.style.opacity = 0;
     notice = undefined;
-    last = -1;
+    if (!takeover) last = -1;
     lastNow = performance.now();
-    const startAt = mode === 'scene' ? chapter.start : mode === 'ride' ? rideAt : filmAt;
+    const startAt = mode === 'scene' ? chapter.start : mode === 'demo' ? 6 : mode === 'ride' ? rideAt : filmAt;
     base = lastNow - startAt * 1000;
     if (!running) {
       if (loader) {
@@ -319,7 +393,7 @@ const Player = (() => {
     loader = ld;
     const preparing = Sound.prepare();
     events();
-    RideUI.install({ select, control: touchControl, action: rideAction, groups: RideShow.groups, scenes: RideShow.scenes });
+    RideUI.install({ select, control: touchControl, action: rideAction, groups: RideShow.groups, scenes: RideShow.scenes, replays: RideReplay.scenes });
     const stt = document.getElementById('st'), bar = document.getElementById('bar'); if (bar) bar.style.opacity = 0;
     Main.update(0, 1 / 60, true); Main.draw(); Main.draw(); // compile what the first frames need
     for (const t of [3, 8, 22, 27, 33, 47, 55, 63, 70, 73, 77]) { Main.update(t, 1 / 60, true); Main.draw(); await new Promise(r => setTimeout(r, 0)); }
@@ -328,7 +402,8 @@ const Player = (() => {
     const stopTuning = I18n.subscribe(showTuning);
     await preparing;
     stopTuning();
-    if (Q.has('ride')) select('ride', false);
+    if (Q.has('demo')) select('demo', false);
+    else if (Q.has('ride')) select('ride', false);
     else if (Q.has('auto')) select('film', false);
     else RideUI.ready();
   }

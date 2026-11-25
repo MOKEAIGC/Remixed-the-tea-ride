@@ -66,6 +66,7 @@ const RideShow = (() => {
   const styles = [['立体', '3D'], ['木版画', 'Woodblock']];
   let timeIndex = 0, time = times[0], print = false, printBlend = 0;
   function setTime(index) { timeIndex = index; }
+  function resetLook() { timeIndex = 0; time = times[0]; print = false; printBlend = 0; }
   function styleFrame(dt) {
     printBlend = damp(printBlend, Number(print), 6, dt);
     time = damp(time, times[timeIndex], 3.2, dt);
@@ -131,7 +132,7 @@ const RideShow = (() => {
   }
 
   return {
-    scenes, groups, actionFor, startCombo, stepCombo, cancelCombo, setTime, styleFrame,
+    scenes, groups, actionFor, startCombo, stepCombo, cancelCombo, resetLook, setTime, styleFrame,
     cycleTime() { setTime((timeIndex + 1) % times.length); return timeLabels[timeIndex]; },
     cycleStyle() { print = !print; return styles[Number(print)]; },
     view(ctx) { return { ...Ride.view(ctx), tod: time, lanGain: lerp(.35, 1.15, sm(55, 67, time)) }; },

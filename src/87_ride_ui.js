@@ -24,11 +24,13 @@ const RideUI = (() => {
   const sceneOverlay = document.getElementById('ride-scene');
   const sceneTitle = document.getElementById('ride-scene-title');
   const sceneDetail = document.getElementById('ride-scene-detail');
+  const sceneCue = document.getElementById('ride-scene-cue');
+  const sceneExit = document.getElementById('ride-scene-exit');
   const sceneProgress = document.getElementById('ride-scene-progress');
   const holds = new Map();
   const languageButtons = document.querySelectorAll('[data-language-toggle]');
   const translations = [];
-  let onControl, returnFocus, currentScene;
+  let onControl, returnFocus, currentScene, currentMode;
 
   function bindText(element, value, attribute) {
     function translate() {
@@ -119,7 +121,7 @@ const RideUI = (() => {
     return button;
   }
 
-  function populate(groups, scenes) {
+  function populate(groups, scenes, replays) {
     for (const { label, actions } of groups) {
       const group = document.createElement('section');
       group.className = 'ride-command-group';
@@ -131,8 +133,19 @@ const RideUI = (() => {
       group.append(title, grid);
       actionList.append(group);
     }
-    sceneList.append(...scenes.map(makeCommand));
-    scenesTab.hidden = !scenes.length;
+    for (const [label, entries] of [
+      [['游玩演示', 'Gameplay Replays'], replays],
+      [['原片演出', 'Original Film'], scenes],
+    ]) {
+      if (!entries.length) continue;
+      const title = document.createElement('h3');
+      bindText(title, label);
+      const group = document.createElement('section');
+      group.className = 'ride-scene-group';
+      group.append(title, ...entries.map(makeCommand));
+      sceneList.append(group);
+    }
+    scenesTab.hidden = !scenes.length && !replays.length;
   }
 
   function showTab(scenes) {
@@ -189,9 +202,9 @@ const RideUI = (() => {
     });
   }
 
-  function install({ select, control, action, groups = [], scenes = [] }) {
+  function install({ select, control, action, groups = [], scenes = [], replays = [] }) {
     onControl = control;
-    populate(groups, scenes);
+    populate(groups, scenes, replays);
     panelToggle.addEventListener('click', togglePanel);
     panelClose.addEventListener('click', () => closePanel());
     actionsTab.addEventListener('click', () => showTab(false));
@@ -217,11 +230,13 @@ const RideUI = (() => {
 
   function setMode(mode) {
     releaseAll();
+    currentMode = mode;
     const riding = mode === 'ride';
     if (!riding) closePanel({ focus: false });
     overlay.hidden = !riding;
     filmEntry.hidden = filmLanguage.hidden = mode !== 'film';
-    sceneOverlay.hidden = mode !== 'scene';
+    sceneOverlay.hidden = mode !== 'scene' && mode !== 'demo';
+    if (!sceneOverlay.hidden) setScene(currentScene);
     document.body.classList.toggle('ride-active', riding);
   }
 
@@ -231,10 +246,13 @@ const RideUI = (() => {
 
   function setScene(scene) {
     currentScene = scene;
-    const { label, detail, progress: fraction } = scene || {};
+    const { label, detail, cue, progress: fraction, takeover = currentMode === 'demo' } = scene || {};
     renderText(sceneTitle, I18n.text(label || ['位点演出', 'Film Scene']));
     renderText(sceneDetail, detail ? I18n.text(detail) : '');
-    sceneDetail.hidden = !detail;
+    sceneDetail.hidden = !detail || Boolean(cue);
+    renderText(sceneCue, cue ? I18n.text(cue) : '');
+    sceneCue.hidden = !cue;
+    renderText(sceneExit, takeover ? I18n.t('接管骑行', 'Take Over') : I18n.t('返回骑行', 'Back to Ride'));
     sceneProgress.hidden = !Number.isFinite(fraction);
     if (!sceneProgress.hidden) sceneProgress.value = Math.max(0, Math.min(1, fraction));
   }
