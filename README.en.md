@@ -20,6 +20,8 @@ It opens on a flat woodblock print. The colour blocks go down on four clacks, th
 
 Download or clone the repository and open the local `index.html` in a browser with WebGL 2. Pick **自由骑行** (Free ride) to explore the market, pier and lake, or **播放短片** (Play film) to watch the original film.
 
+The interface starts in Simplified Chinese. Select **English** on the start screen or use the language button during play.
+
 ### Free ride
 
 | Input | Action |

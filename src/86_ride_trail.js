@@ -2,9 +2,9 @@
 
 const RideTrail = (() => {
   const stops = [
-    { name: '集市入口', x: -25, z: 0, note: 78 },
-    { name: '茶摊街', x: -50, z: 0, note: 84 },
-    { name: '湖边码头', x: -82, z: 0, note: 90 },
+    { name: ['集市入口', 'Market Entrance'], x: -25, z: 0, note: 78 },
+    { name: ['茶摊街', 'Tea Stall Row'], x: -50, z: 0, note: 84 },
+    { name: ['湖边码头', 'Lakeside Pier'], x: -82, z: 0, note: 90 },
   ];
   const ring = new THREE.RingGeometry(1.72, 1.84, 64).rotateX(-Math.PI / 2);
   const diamond = new THREE.OctahedronGeometry(.23);
@@ -58,7 +58,7 @@ const RideTrail = (() => {
       }
     }
     return { speed: ctx.st.speed, visited, total: stops.length,
-      location: next ? `${next.name} · ${Math.round(distance)} 米` : '路线完成' };
+      location: next ? `${I18n.text(next.name)} · ${Math.round(distance)} ${I18n.t('米', 'm')}` : I18n.t('路线完成', 'Route Complete') };
   }
 
   return { setActive, reset, update };

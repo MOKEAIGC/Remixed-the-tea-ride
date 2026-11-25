@@ -4,7 +4,7 @@ const Ride = (() => {
   const WALK_SPEED = 2.9, RUN_SPEED = 6.8, REVERSE_SPEED = 1.7;
   const AIR_SPEED = 11.4, AIR_LIMIT = 32, CRUISE_SPEED = 7.4;
   const BODY_RADIUS = .64, SCREEN_ASPECT = 16 / 9;
-  const cameraLabels = ['跟随镜头', '骑手视角', '侧面跟拍'];
+  const cameraLabels = [['跟随镜头', 'Follow Camera'], ['骑手视角', 'Rider View'], ['侧面跟拍', 'Side View']];
   const spawn = V3(-12, 0, 0);
   const state = {
     pos: spawn.clone(), vel: V3(), t: 0, yaw: PI, pitch: 0, roll: 0,
@@ -362,5 +362,5 @@ const Ride = (() => {
   }
 
   return { state, reset, goTo, setControl, clearControls, step, takeoff, land, camera, view, orbit, zoom, cycleCamera,
-    get cameraLabel() { return cameraLabels[cameraIndex]; } };
+    get cameraLabel() { return I18n.text(cameraLabels[cameraIndex]); } };
 })();

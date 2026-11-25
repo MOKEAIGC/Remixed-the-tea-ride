@@ -7,9 +7,9 @@ A module that fails `node --check` stops a studio build that asked for it; in th
 import glob, os, re, subprocess, sys, tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); SRC = os.path.join(ROOT, "src"); V = os.path.join(ROOT, "vendor")
 a = sys.argv[1:]; studio = a[1] if a and a[0] == "--studio" else None; names = a[2:] if studio else None
-CORE = ["00_util.js", "02_sdf.js", "04_sculpt.js", "06_score.js", "08_look.js", "10_sky.js", "16_path.js", "80_post.js", "90_main.js"]
+CORE = ["00_i18n.js", "00_util.js", "02_sdf.js", "04_sculpt.js", "06_score.js", "08_look.js", "10_sky.js", "16_path.js", "80_post.js", "90_main.js"]
 OUT = os.path.join(ROOT, "dist", f"studio-{studio}.html" if studio else "pelican-market-3d.html")
-core = open(os.path.join(V, "three.core.min.js")).read(); mod = open(os.path.join(V, "three.module.min.js")).read()
+core = open(os.path.join(V, "three.core.min.js"), encoding="utf-8").read(); mod = open(os.path.join(V, "three.module.min.js"), encoding="utf-8").read()
 def pairs(body):
     out = []
     for it in body.split(","):
@@ -32,7 +32,7 @@ files = sorted(glob.glob(os.path.join(SRC, "*.js")))
 if studio: files = [f for f in files if os.path.basename(f) in CORE or any(os.path.basename(f).startswith(n.replace(".js", "")) for n in names)]
 app = []
 for f in files:
-    src = open(f).read(); assert "</script" not in src.lower(), f
+    src = open(f, encoding="utf-8").read(); assert "</script" not in src.lower(), f
     r = subprocess.run(["node", "--check", f], capture_output=True, text=True)
     if r.returncode != 0:
         print(f"SYNTAX ERROR in {os.path.basename(f)}:\n{r.stderr.strip()[:900]}")
@@ -40,9 +40,9 @@ for f in files:
         print("  -> skipped"); continue
     app.append(f"// ===== {os.path.basename(f)} =====\n" + src.replace("'use strict';", "", 1))
 joined = "'use strict';\n" + "\n".join(app)
-with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as tf: tf.write(joined)
+with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".js", delete=False) as tf: tf.write(joined)
 r = subprocess.run(["node", "--check", tf.name], capture_output=True, text=True); os.unlink(tf.name)
 if r.returncode != 0: print("SYNTAX ERROR in the joined app (same top-level name in two modules?):\n" + r.stderr.strip()[:1500]); sys.exit(1)
-out = open(os.path.join(SRC, "shell.html")).read().replace("{{THREE}}", three).replace("{{APP}}", joined)
-os.makedirs(os.path.dirname(OUT), exist_ok=True); tmp = OUT + f".{os.getpid()}.tmp"; open(tmp, "w").write(out); os.replace(tmp, OUT)
+out = open(os.path.join(SRC, "shell.html"), encoding="utf-8").read().replace("{{THREE}}", three).replace("{{APP}}", joined)
+os.makedirs(os.path.dirname(OUT), exist_ok=True); tmp = OUT + f".{os.getpid()}.tmp"; open(tmp, "w", encoding="utf-8").write(out); os.replace(tmp, OUT)
 print(f"built {os.path.relpath(OUT, ROOT)} {len(out)/1024:.0f} KB ({len(app)} modules)")

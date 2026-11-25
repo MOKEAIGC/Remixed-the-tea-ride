@@ -5,6 +5,7 @@ const RideUI = (() => {
   const menu = document.getElementById('ride-menu');
   const overlay = document.getElementById('ride-interface');
   const filmEntry = document.getElementById('ride-film-entry');
+  const filmLanguage = document.getElementById('ride-film-language');
   const location = document.getElementById('ride-location');
   const progress = document.getElementById('ride-progress');
   const speedometer = document.getElementById('ride-speed');
@@ -25,7 +26,45 @@ const RideUI = (() => {
   const sceneDetail = document.getElementById('ride-scene-detail');
   const sceneProgress = document.getElementById('ride-scene-progress');
   const holds = new Map();
-  let onControl, returnFocus;
+  const languageButtons = document.querySelectorAll('[data-language-toggle]');
+  const translations = [];
+  let onControl, returnFocus, currentScene;
+
+  function bindText(element, value, attribute) {
+    function translate() {
+      const localized = I18n.text(value);
+      if (attribute) element.setAttribute(attribute, localized);
+      else renderText(element, localized);
+    }
+    translate();
+    translations.push(translate);
+  }
+
+  for (const element of document.querySelectorAll('[data-en-text]')) {
+    bindText(element, [element.textContent, element.dataset.enText]);
+  }
+  for (const [dataAttribute, attribute] of [['data-en-label', 'aria-label'], ['data-en-title', 'title']]) {
+    for (const element of document.querySelectorAll(`[${dataAttribute}]`)) {
+      bindText(element, [element.getAttribute(attribute), element.getAttribute(dataAttribute)], attribute);
+    }
+  }
+
+  function refreshLocale() {
+    for (const translate of translations) translate();
+    for (const button of languageButtons) {
+      const english = button.dataset.languageToggle === 'long' ? 'English' : 'EN';
+      const hint = I18n.t('Switch to English', '切换到中文');
+      renderText(button, I18n.t(english, '中文'));
+      button.lang = I18n.t('en', 'zh-CN');
+      button.title = hint;
+      button.setAttribute('aria-label', hint);
+    }
+    setScene(currentScene);
+  }
+
+  for (const button of languageButtons) button.addEventListener('click', () => I18n.toggle());
+  I18n.subscribe(refreshLocale);
+  refreshLocale();
 
   function press(source, button) {
     if (holds.has(source)) return;
@@ -63,18 +102,18 @@ const RideUI = (() => {
 
     const title = document.createElement('span');
     title.className = 'ride-command-title';
-    title.textContent = label;
+    bindText(title, label);
     button.append(title);
     if (key) {
       const hint = document.createElement('kbd');
       hint.className = 'ride-key';
-      hint.textContent = key;
+      bindText(hint, key);
       button.append(hint);
     }
     if (detail) {
       const description = document.createElement('span');
       description.className = 'ride-command-detail';
-      description.textContent = detail;
+      bindText(description, detail);
       button.append(description);
     }
     return button;
@@ -85,7 +124,7 @@ const RideUI = (() => {
       const group = document.createElement('section');
       group.className = 'ride-command-group';
       const title = document.createElement('h3');
-      title.textContent = label;
+      bindText(title, label);
       const grid = document.createElement('div');
       grid.className = 'ride-command-grid';
       grid.append(...actions.map(makeCommand));
@@ -181,7 +220,7 @@ const RideUI = (() => {
     const riding = mode === 'ride';
     if (!riding) closePanel({ focus: false });
     overlay.hidden = !riding;
-    filmEntry.hidden = mode !== 'film';
+    filmEntry.hidden = filmLanguage.hidden = mode !== 'film';
     sceneOverlay.hidden = mode !== 'scene';
     document.body.classList.toggle('ride-active', riding);
   }
@@ -191,28 +230,31 @@ const RideUI = (() => {
   }
 
   function setScene(scene) {
+    currentScene = scene;
     const { label, detail, progress: fraction } = scene || {};
-    renderText(sceneTitle, label || '位点演出');
-    renderText(sceneDetail, detail || '');
+    renderText(sceneTitle, I18n.text(label || ['位点演出', 'Film Scene']));
+    renderText(sceneDetail, detail ? I18n.text(detail) : '');
     sceneDetail.hidden = !detail;
     sceneProgress.hidden = !Number.isFinite(fraction);
     if (!sceneProgress.hidden) sceneProgress.value = Math.max(0, Math.min(1, fraction));
   }
 
   function update({ speed, location: destination, visited, total, status, style, camera, scene }) {
-    const label = destination || '自由骑行';
-    const count = total ? `探索 ${visited} / ${total}` : '';
-    const reading = Number.isFinite(speed) ? `${Math.round(speed * 3.6)} km/h` : '';
+    const label = destination || I18n.t('自由骑行', 'Free Ride');
+    const count = total ? `${I18n.t('探索', 'Visited')} ${visited} / ${total}` : '';
+    const reading = Number.isFinite(speed) ? `${Math.round(speed * 3.6)} ${I18n.t('公里/时', 'km/h')}` : '';
     const view = [style, camera].filter(Boolean).join(' · ');
-    const activeCombo = typeof scene === 'string' ? scene : scene?.label;
+    const comboName = typeof scene === 'string' || Array.isArray(scene) ? scene : scene?.label;
+    const activeCombo = comboName ? I18n.text(comboName) : '';
     renderText(location, label);
     renderText(progress, count);
     renderText(speedometer, reading);
     renderText(motion, status || '');
     renderText(viewInfo, view);
-    if (comboLabel.textContent !== (activeCombo || '')) {
-      comboLabel.textContent = activeCombo || '';
-      if (activeCombo) combo.setAttribute('aria-label', `结束组合 ${activeCombo}`);
+    renderText(comboLabel, activeCombo);
+    if (activeCombo) {
+      const accessibleName = I18n.t(`结束组合 ${activeCombo}`, `Cancel combo: ${activeCombo}`);
+      if (combo.getAttribute('aria-label') !== accessibleName) combo.setAttribute('aria-label', accessibleName);
     }
     motion.hidden = !status;
     viewInfo.hidden = !view;

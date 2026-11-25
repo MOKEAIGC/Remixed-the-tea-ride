@@ -9,7 +9,15 @@ const Player = (() => {
     KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
     ShiftLeft: 'sprint', ShiftRight: 'sprint', KeyZ: 'ascend', KeyX: 'descend',
   };
-  const say = (s, ms = 3600) => { hud.textContent = s; hud.style.opacity = 1; clearTimeout(hudT); hudT = setTimeout(() => hud.style.opacity = 0, ms); };
+  let notice;
+  I18n.subscribe(() => { if (notice) hud.textContent = I18n.text(notice); });
+  const say = (message, ms = 3600) => {
+    notice = message;
+    hud.textContent = I18n.text(notice);
+    hud.style.opacity = 1;
+    clearTimeout(hudT);
+    hudT = setTimeout(() => { hud.style.opacity = 0; notice = undefined; }, ms);
+  };
   const raw = () => paused ? pausedAt : Sound.on ? Sound.time() : (performance.now() - base) / 1000;         // runs on over loops
   const clock = () => mode === 'scene' ? clamp(raw(), chapter.start, chapter.end) : mode === 'ride' ? Math.max(0, raw()) % Score.DUR : mod(raw(), Score.DUR);
   function sound() {
@@ -103,7 +111,7 @@ const Player = (() => {
 
   function fullscreen() {
     const change = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
-    change?.catch(() => say('当前窗口无法切换全屏'));
+    change?.catch(() => say(['当前窗口无法切换全屏', 'Full screen is unavailable in this window.']));
   }
 
   function rideAction(action, ...args) {
@@ -123,22 +131,25 @@ const Player = (() => {
     switch (action) {
       case 'panel': RideUI.togglePanel(); break;
       case 'reset': resetRide(); break;
-      case 'cancelCombo': if (RideShow.cancelCombo()) say('已恢复手动控制'); break;
+      case 'cancelCombo': if (RideShow.cancelCombo()) say(['已恢复手动控制', 'Manual control restored']); break;
       case 'takeoff': if (Ride.takeoff()) Sound.hit('whoosh', { v: .7 }); break;
-      case 'land': if (Ride.land()) say('正在寻找可降落的位置'); break;
+      case 'land': if (Ride.land()) say(['正在寻找可降落的位置', 'Looking for a landing spot']); break;
       case 'honk': Pelican.honk(rideTime, true); Sound.hit('honk', { v: .75 }); break;
       case 'sip': if (Rider.sip(rideTime, true)) Sound.hit('slurp', { v: .5, delay: .62 }); break;
       case 'lemon': case 'lemonRain': tossLemons(action === 'lemonRain'); break;
       case 'lantern': case 'lanterns': {
         const count = Air.releaseLanterns(Main.ctx, action === 'lantern' ? 1 : 7);
-        if (count) { Sound.hit('bell', { m: count > 1 ? 86 : 79, v: .52 }); say(`放飞 ${count} 盏孔明灯`); }
+        if (count) {
+          Sound.hit('bell', { m: count > 1 ? 86 : 79, v: .52 });
+          say([`放飞 ${count} 盏孔明灯`, `Released ${count} sky ${count === 1 ? 'lantern' : 'lanterns'}`]);
+        }
         break;
       }
       case 'style': say(RideShow.cycleStyle()); break;
       case 'time': if (args.length) RideShow.setTime(args[0]); else say(RideShow.cycleTime()); break;
       case 'camera': say(Ride.cycleCamera()); break;
       case 'fullscreen': fullscreen(); break;
-      case 'mute': Sound.mute(!Sound.muted); say(Sound.muted ? '已静音' : '声音开启'); break;
+      case 'mute': toggleMute(); break;
       case 'pause': toggle(); break;
       case 'score': Strip.toggle(); break;
       case 'drum': Score.live('taiko', { t, v: 1, sz: 1 }); break;
@@ -151,6 +162,11 @@ const Player = (() => {
         }
         break;
     }
+  }
+
+  function toggleMute(ms) {
+    Sound.mute(!Sound.muted);
+    say(Sound.muted ? ['已静音', 'Muted'] : ['声音开启', 'Sound on'], ms);
   }
 
   function rideKey(e) {
@@ -174,10 +190,13 @@ const Player = (() => {
     if (action) { e.preventDefault(); rideAction(action); }
   }
 
-  function keys(e) { if (!running || e.metaKey || e.ctrlKey || e.altKey) return; if (mode === 'ride') return rideKey(e); if (mode === 'scene') { if (e.repeat) return; if (e.code === 'Escape') select('ride'); else if (e.code === 'KeyM') Sound.mute(!Sound.muted); else if (e.code === 'Space' && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); toggle(); } else if (/^Digit[1-8]$/.test(e.code) && !e.shiftKey) rideAction(RideShow.actionFor(e)); return; } const k = e.key.toLowerCase(), ctx = Main.ctx, t = ctx.t; if (k === ' ' && e.target instanceof HTMLButtonElement) return; if (!Sound.on) sound(); const row = 'asdfghjkl;'.indexOf(k); if (row >= 0 && !e.repeat) { const sc = Score.scaleAt(t), m = sc[row % 5] + 12 * (1 + Math.floor(row / 5)); Score.live('koto', { t, m, r: clamp(Math.round((m - 50) / 4.2), 0, 7), v: .95 }); if (typeof Rider !== 'undefined' && Rider.drop) Rider.drop(row / 10, .5, .6); return; }
-    if (k === ' ') { e.preventDefault(); toggle(); } else if (k === 'n') Strip.toggle(); else if (k === 'q') { if (typeof Pelican !== 'undefined' && Pelican.honk) Pelican.honk(t); Sound.hit('honk', { v: .75 }); } else if (k === 'w') { if (typeof Rider !== 'undefined' && Rider.sip) Rider.sip(t); Sound.hit('slurp', { v: .5, delay: .62 }); } else if (k === 'e') { for (let i = 0; i < 10; i++) Phys.add({ x: ctx.st.pos.x - 1.2 - Math.random() * 3, y: ctx.st.pos.y + 5 + Math.random() * 2.5, z: ctx.st.pos.z - 2.6 + Math.random() * 4, vx: ctx.st.vel.x, vy: 0, vz: ctx.st.vel.z, live: true, r: .085 }); } else if (k === 'b') Score.live('taiko', { t, v: 1, sz: 1 }); else if (k === 'p') { Film.printLock = Film.printLock === undefined ? 1 : undefined; } else if (k === 'r') { Film.free.tride = Film.free.tride ? 0 : 1; } else if (k === 'm') { Sound.mute(!Sound.muted); say(Sound.muted ? 'muted' : 'sound on', 1200); } else if (k === 'x') { if (document.fullscreenElement) document.exitFullscreen(); else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); } else if (k === '?' || k === '/') say(HELP, 8000); else if (k === 'arrowright' || k === 'arrowleft') seek((((raw() % Score.DUR) + (k === 'arrowright' ? 4.8 : -4.8)) + Score.DUR) % Score.DUR); }
+  function keys(e) { if (!running || e.metaKey || e.ctrlKey || e.altKey) return; if (mode === 'ride') return rideKey(e); if (mode === 'scene') { if (e.repeat) return; if (e.code === 'Escape') select('ride'); else if (e.code === 'KeyM') toggleMute(1200); else if (e.code === 'Space' && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); toggle(); } else if (/^Digit[1-8]$/.test(e.code) && !e.shiftKey) rideAction(RideShow.actionFor(e)); return; } const k = e.key.toLowerCase(), ctx = Main.ctx, t = ctx.t; if (k === ' ' && e.target instanceof HTMLButtonElement) return; if (!Sound.on) sound(); const row = 'asdfghjkl;'.indexOf(k); if (row >= 0 && !e.repeat) { const sc = Score.scaleAt(t), m = sc[row % 5] + 12 * (1 + Math.floor(row / 5)); Score.live('koto', { t, m, r: clamp(Math.round((m - 50) / 4.2), 0, 7), v: .95 }); if (typeof Rider !== 'undefined' && Rider.drop) Rider.drop(row / 10, .5, .6); return; }
+    if (k === ' ') { e.preventDefault(); toggle(); } else if (k === 'n') Strip.toggle(); else if (k === 'q') { if (typeof Pelican !== 'undefined' && Pelican.honk) Pelican.honk(t); Sound.hit('honk', { v: .75 }); } else if (k === 'w') { if (typeof Rider !== 'undefined' && Rider.sip) Rider.sip(t); Sound.hit('slurp', { v: .5, delay: .62 }); } else if (k === 'e') { for (let i = 0; i < 10; i++) Phys.add({ x: ctx.st.pos.x - 1.2 - Math.random() * 3, y: ctx.st.pos.y + 5 + Math.random() * 2.5, z: ctx.st.pos.z - 2.6 + Math.random() * 4, vx: ctx.st.vel.x, vy: 0, vz: ctx.st.vel.z, live: true, r: .085 }); } else if (k === 'b') Score.live('taiko', { t, v: 1, sz: 1 }); else if (k === 'p') { Film.printLock = Film.printLock === undefined ? 1 : undefined; } else if (k === 'r') { Film.free.tride = Film.free.tride ? 0 : 1; } else if (k === 'm') toggleMute(1200); else if (k === 'x') fullscreen(); else if (k === '?' || k === '/') say(HELP, 8000); else if (k === 'arrowright' || k === 'arrowleft') seek((((raw() % Score.DUR) + (k === 'arrowright' ? 4.8 : -4.8)) + Score.DUR) % Score.DUR); }
   function seek(t) { base = performance.now() - t * 1000; if (paused) pausedAt = t; if (Sound.on) Sound.play(t); last = -1; }
-  const HELP = 'tap anything to play it · tap air to throw a lemon · drag to look, scroll to zoom · A–; koto · B drum · Q honk · W sip · E lemons · R ride · P print · N the score · space pause · M mute · X full screen';
+  const HELP = [
+    '点物件互动 · 点空处抛柠檬 · 拖动环视 · 滚轮缩放 · A 到 ; 弹筝 · B 敲鼓 · Q 鸣叫 · W 喝茶 · E 柠檬雨 · R 骑手视角 · P 木版画 · N 乐谱 · 空格暂停 · M 静音 · X 全屏',
+    'Click an object to play it · click empty space to throw a lemon · drag to look · scroll to zoom · A through ; koto · B drum · Q honk · W sip · E lemon rain · R rider view · P woodblock · N score · Space pause · M mute · X full screen',
+  ];
   function orbit(dx, dy) {
     if (mode === 'ride') Ride.orbit(dx, dy);
     else {
@@ -227,8 +246,10 @@ const Player = (() => {
       if ((motion === 'walk' || motion === 'run') && Math.floor(phase) > step && speed > .35) {
         Sound.hit(pos.x < -74 ? 'plank' + Math.floor(phase) % 4 : 'hoof', { v: .35 });
       }
-      const flight = motion === 'fly' ? `飞行 ${Math.round(Ride.state.altitude)} 米` : motion === 'float' ? '水面漂浮' : '地面骑行';
-      const status = paused ? '已暂停' : landing ? '正在降落' : flight;
+      const height = Math.round(Ride.state.altitude);
+      const flight = motion === 'fly' ? I18n.t(`飞行 ${height} 米`, `Flying · ${height} m`) :
+        motion === 'float' ? I18n.t('水面漂浮', 'On the water') : I18n.t('地面骑行', 'On the ground');
+      const status = paused ? I18n.t('已暂停', 'Paused') : landing ? I18n.t('正在降落', 'Landing') : flight;
       RideUI.update({ ...RideTrail.update(Main.ctx), status, style: RideShow.label, camera: Ride.cameraLabel, scene: RideShow.combo });
     } else if (jump) Main.update(t, 1 / 60, true);
     else if (dtR > 0 || paused) {
@@ -276,6 +297,7 @@ const Player = (() => {
     RideUI.setMode(mode);
     RideUI.setScene(chapter ? { ...chapter, progress: 0 } : null);
     hud.style.opacity = 0;
+    notice = undefined;
     last = -1;
     lastNow = performance.now();
     const startAt = mode === 'scene' ? chapter.start : mode === 'ride' ? rideAt : filmAt;
@@ -301,8 +323,11 @@ const Player = (() => {
     const stt = document.getElementById('st'), bar = document.getElementById('bar'); if (bar) bar.style.opacity = 0;
     Main.update(0, 1 / 60, true); Main.draw(); Main.draw(); // compile what the first frames need
     for (const t of [3, 8, 22, 27, 33, 47, 55, 63, 70, 73, 77]) { Main.update(t, 1 / 60, true); Main.draw(); await new Promise(r => setTimeout(r, 0)); }
-    if (stt) stt.textContent = 'tuning the strings';
+    const showTuning = () => { if (stt) stt.textContent = I18n.t('正在准备音乐', 'Preparing the music'); };
+    showTuning();
+    const stopTuning = I18n.subscribe(showTuning);
     await preparing;
+    stopTuning();
     if (Q.has('ride')) select('ride', false);
     else if (Q.has('auto')) select('film', false);
     else RideUI.ready();

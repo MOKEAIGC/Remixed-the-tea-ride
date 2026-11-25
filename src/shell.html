@@ -1,5 +1,5 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>The Tea Ride</title>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>鹈鹕茶旅 · The Tea Ride</title>
 <style>
 html,body{margin:0;height:100%;background:#e9d9b6;overflow:hidden}
 canvas#c{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;display:block;touch-action:none;cursor:grab}
@@ -10,7 +10,7 @@ canvas#c:focus{outline:none}
 #st{font:500 10px/1 -apple-system,system-ui,sans-serif;opacity:.55;letter-spacing:.14em;text-transform:uppercase}
 #hud{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);font:600 11px/1.2 -apple-system,system-ui,sans-serif;letter-spacing:.05em;color:#1d2a44;background:rgba(246,236,212,.82);padding:9px 14px;border-radius:999px;transition:opacity .8s;opacity:0;pointer-events:none;z-index:4;white-space:nowrap;max-width:94vw;overflow:hidden;text-overflow:ellipsis}
 [hidden]{display:none!important}
-#ride-menu,#ride-interface,#ride-film-entry,#ride-scene{font:600 13px/1.3 system-ui,sans-serif;color:#1d2a44;letter-spacing:normal}
+#ride-menu,#ride-interface,#ride-film-entry,#ride-film-language,#ride-scene,[data-language-toggle]{font:600 13px/1.3 system-ui,sans-serif;color:#1d2a44;letter-spacing:normal}
 #ride-menu{display:flex;flex-wrap:wrap;justify-content:center;gap:9px;margin:25px 20px 0}
 .ride-button{border:1px solid #a8987b;border-radius:7px;padding:9px 13px;color:#1d2a44;background:#f8eed9;cursor:pointer;font:inherit}
 .ride-button:hover{background:#fff7e6}
@@ -18,6 +18,8 @@ canvas#c:focus{outline:none}
 .ride-button--primary{background:#a33226;color:#fff7e6;border-color:#8f2a20}
 .ride-button--primary:hover{background:#b63b2e}
 #ride-menu .ride-button{padding:12px 25px}
+#ride-start-language{position:absolute;top:max(12px,env(safe-area-inset-top));right:14px}
+[data-language-toggle]{white-space:nowrap}
 #ride-interface{position:fixed;inset:0;pointer-events:none;z-index:4}
 #ride-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin:max(12px,env(safe-area-inset-top)) 14px 0}
 #ride-status,#ride-legend{border:1px solid #a8987b;border-radius:8px;background:rgba(248,238,217,.96);box-shadow:0 2px 12px #1625372b}
@@ -27,13 +29,14 @@ canvas#c:focus{outline:none}
 #ride-motion{grid-column:1/-1;color:#3f5269;font-size:11px}
 #ride-combo{grid-column:1/-1;justify-self:start;pointer-events:auto;display:flex;align-items:center;gap:7px;padding:3px 6px;margin-top:2px;font-size:11px}
 #ride-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-#ride-actions .ride-button,#ride-film-entry{pointer-events:auto;box-shadow:0 2px 12px #1625372b}
+#ride-actions .ride-button,#ride-film-entry,#ride-film-language{pointer-events:auto;box-shadow:0 2px 12px #1625372b}
 #ride-panel-toggle{display:inline-flex;align-items:center;gap:7px;background:#25354d;border-color:#25354d;color:#fff8e8}
 #ride-panel-toggle:hover,#ride-panel-toggle[aria-expanded=true]{background:#394d69}
 .ride-sliders{width:13px;height:11px;position:relative;border-block:1px solid currentColor;box-sizing:border-box}
 .ride-sliders::before{content:"";position:absolute;left:0;right:0;top:4px;border-top:1px solid currentColor}
 .ride-sliders::after{content:"";position:absolute;left:2px;top:-2px;width:3px;height:3px;border-radius:50%;background:currentColor;box-shadow:6px 5px currentColor,2px 10px currentColor}
 #ride-film-entry{position:fixed;top:max(12px,env(safe-area-inset-top));right:14px;z-index:4}
+#ride-film-language{position:fixed;top:calc(max(12px,env(safe-area-inset-top)) + 43px);right:14px;z-index:4}
 #ride-legend{position:absolute;bottom:max(16px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:flex;justify-content:center;flex-wrap:wrap;gap:6px 13px;width:max-content;max-width:calc(100vw - 42px);padding:8px 12px;font-size:11px}
 #ride-legend span{white-space:nowrap}
 #ride-legend kbd{font:inherit;font-weight:800;margin-right:5px}
@@ -88,6 +91,7 @@ body.ride-active #hud{bottom:66px}
   grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;align-items:center;
 }
 #ride-scene p{margin:3px 0 0;color:#495b70;font-size:11px}
+#ride-scene-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:5px}
 #ride-scene progress{grid-column:1/-1;width:100%;height:5px;accent-color:#a33226}
 #ride-touch{display:none;position:absolute;bottom:max(14px,env(safe-area-inset-bottom));left:14px;right:14px;align-items:flex-end;justify-content:space-between;gap:12px}
 #ride-touch .ride-button{min-width:46px;min-height:46px;padding:7px 9px;pointer-events:auto;touch-action:none;user-select:none;box-shadow:0 2px 8px #16253745}
@@ -110,6 +114,7 @@ body.ride-active #hud{bottom:66px}
   #ride-top #ride-reset-button{display:none}
   #ride-status{column-gap:7px;padding:7px 8px}
   #ride-location{font-size:12px}
+  #ride-scene-actions .ride-button{padding:7px 8px;font-size:11px}
   .ride-panel-head,.ride-panel-options,#ride-panel-body{padding-inline:12px}
   #ride-touch{left:9px;right:9px;gap:7px}
   #ride-touch .ride-button{min-width:42px;padding-inline:6px}
@@ -121,65 +126,68 @@ body.ride-active #hud{bottom:66px}
 <body>
 <canvas id="c" tabindex="-1"></canvas>
 <div id="ld">
-  <b>The Tea Ride</b>
+  <button id="ride-start-language" type="button" class="ride-button" data-language-toggle="long" lang="en" title="Switch to English" aria-label="Switch to English">English</button>
+  <b data-en-text="The Tea Ride">鹈鹕茶旅</b>
   <div id="bar"><s></s></div>
-  <div id="st">carving the blocks</div>
-  <div id="ride-menu" lang="zh-CN" role="group" aria-label="选择模式" hidden>
-    <button type="button" class="ride-button ride-button--primary" data-ride-mode="ride">自由骑行</button>
-    <button type="button" class="ride-button" data-ride-mode="film">播放短片</button>
+  <div id="st">准备木版画</div>
+  <div id="ride-menu" role="group" aria-label="选择模式" data-en-label="Choose a mode" hidden>
+    <button type="button" class="ride-button ride-button--primary" data-ride-mode="ride" data-en-text="Free Ride">自由骑行</button>
+    <button type="button" class="ride-button" data-ride-mode="film" data-en-text="Watch Film">播放短片</button>
   </div>
 </div>
 <div id="hud"></div>
-<button id="ride-film-entry" lang="zh-CN" type="button" class="ride-button" data-ride-mode="ride" hidden>自由骑行</button>
-<div id="ride-interface" lang="zh-CN" hidden>
+<button id="ride-film-entry" type="button" class="ride-button" data-ride-mode="ride" data-en-text="Free Ride" hidden>自由骑行</button>
+<button id="ride-film-language" type="button" class="ride-button" data-language-toggle lang="en" title="Switch to English" aria-label="Switch to English" hidden>EN</button>
+<div id="ride-interface" hidden>
   <div id="ride-top">
     <div id="ride-status">
       <span id="ride-location"></span>
       <span id="ride-progress" aria-live="polite"></span>
       <span id="ride-speed"></span>
       <span id="ride-motion" hidden></span>
-      <button id="ride-combo" type="button" class="ride-button" data-ride-action="cancelCombo" title="结束组合 (Esc)" hidden><span id="ride-combo-label"></span><span aria-hidden="true">×</span></button>
+      <button id="ride-combo" type="button" class="ride-button" data-ride-action="cancelCombo" title="结束组合 (Esc)" data-en-title="Cancel combo (Esc)" hidden><span id="ride-combo-label"></span><span aria-hidden="true">×</span></button>
     </div>
     <div id="ride-actions">
-      <button id="ride-reset-button" type="button" class="ride-button" data-ride-action="reset" title="返回起点 (R)">返回起点</button>
-      <button type="button" class="ride-button" data-ride-mode="film">播放短片</button>
+      <button id="ride-reset-button" type="button" class="ride-button" data-ride-action="reset" title="返回起点 (R)" data-en-title="Return to the start (R)" data-en-text="Reset">返回起点</button>
+      <button type="button" class="ride-button" data-ride-mode="film" data-en-text="Watch Film">播放短片</button>
       <button id="ride-panel-toggle" type="button" class="ride-button" aria-expanded="false" aria-controls="ride-panel" aria-keyshortcuts="H">
-        <span class="ride-sliders" aria-hidden="true"></span>控制台 <kbd class="ride-key" aria-hidden="true">H</kbd>
+        <span class="ride-sliders" aria-hidden="true"></span><span data-en-text="Controls">控制台</span><kbd class="ride-key" aria-hidden="true">H</kbd>
       </button>
+      <button type="button" class="ride-button" data-language-toggle lang="en" title="Switch to English" aria-label="Switch to English">EN</button>
     </div>
   </div>
-  <div id="ride-legend" aria-label="键盘和鼠标操作">
-    <span><kbd>WASD / 方向键</kbd>移动</span>
-    <span><kbd>Shift</kbd>加速</span>
-    <span><kbd>空格</kbd>起飞</span>
-    <span><kbd>C</kbd>降落</span>
-    <span><kbd>Z / X</kbd>升降</span>
-    <span><kbd>H</kbd>控制台</span>
+  <div id="ride-legend" aria-label="键盘和鼠标操作" data-en-label="Keyboard and mouse controls">
+    <span><kbd data-en-text="WASD / Arrows">WASD / 方向键</kbd><span data-en-text="Move">移动</span></span>
+    <span><kbd>Shift</kbd><span data-en-text="Boost">加速</span></span>
+    <span><kbd data-en-text="Space">空格</kbd><span data-en-text="Take off">起飞</span></span>
+    <span><kbd>C</kbd><span data-en-text="Land">降落</span></span>
+    <span><kbd>Z / X</kbd><span data-en-text="Climb / descend">升降</span></span>
+    <span><kbd>H</kbd><span data-en-text="Controls">控制台</span></span>
   </div>
-  <div id="ride-touch" role="group" aria-label="触控骑行">
+  <div id="ride-touch" role="group" aria-label="触控骑行" data-en-label="Touch controls">
     <div id="ride-directions">
-      <button type="button" class="ride-button" data-ride-hold="forward" aria-label="前进">↑</button>
-      <button type="button" class="ride-button" data-ride-hold="left" aria-label="左转">←</button>
-      <button type="button" class="ride-button" data-ride-hold="back" aria-label="后退">↓</button>
-      <button type="button" class="ride-button" data-ride-hold="right" aria-label="右转">→</button>
+      <button type="button" class="ride-button" data-ride-hold="forward" aria-label="前进" data-en-label="Move forward">↑</button>
+      <button type="button" class="ride-button" data-ride-hold="left" aria-label="左转" data-en-label="Turn left">←</button>
+      <button type="button" class="ride-button" data-ride-hold="back" aria-label="后退" data-en-label="Move backward">↓</button>
+      <button type="button" class="ride-button" data-ride-hold="right" aria-label="右转" data-en-label="Turn right">→</button>
     </div>
     <div id="ride-touch-actions">
-      <button type="button" class="ride-button" data-ride-hold="sprint">加速</button>
-      <button type="button" class="ride-button" data-ride-hold="ascend">上升</button>
-      <button type="button" class="ride-button" data-ride-hold="descend">下降</button>
-      <button type="button" class="ride-button" data-ride-action="takeoff">起飞</button>
-      <button type="button" class="ride-button" data-ride-action="land">降落</button>
-      <button type="button" class="ride-button" data-ride-action="sip">喝茶</button>
+      <button type="button" class="ride-button" data-ride-hold="sprint" data-en-text="Boost">加速</button>
+      <button type="button" class="ride-button" data-ride-hold="ascend" data-en-text="Climb">上升</button>
+      <button type="button" class="ride-button" data-ride-hold="descend" data-en-text="Descend">下降</button>
+      <button type="button" class="ride-button" data-ride-action="takeoff" data-en-text="Take off">起飞</button>
+      <button type="button" class="ride-button" data-ride-action="land" data-en-text="Land">降落</button>
+      <button type="button" class="ride-button" data-ride-action="sip" data-en-text="Sip tea">喝茶</button>
     </div>
   </div>
   <section id="ride-panel" class="ride-glass" aria-labelledby="ride-panel-title" tabindex="-1" hidden>
     <header class="ride-panel-head">
-      <div><h2 id="ride-panel-title">骑行控制台</h2><p id="ride-view-info" hidden></p></div>
-      <button id="ride-panel-close" type="button" class="ride-button" title="收起控制台 (Esc)" aria-label="收起控制台" aria-keyshortcuts="Escape">×</button>
+      <div><h2 id="ride-panel-title" data-en-text="Ride Controls">骑行控制台</h2><p id="ride-view-info" hidden></p></div>
+      <button id="ride-panel-close" type="button" class="ride-button" title="收起控制台 (Esc)" data-en-title="Close controls (Esc)" aria-label="收起控制台" data-en-label="Close controls" aria-keyshortcuts="Escape">×</button>
     </header>
-    <div class="ride-panel-options" role="group" aria-label="控制台内容">
-      <button id="ride-show-actions" type="button" class="ride-button" aria-controls="ride-command-list" aria-pressed="true">动作与视角</button>
-      <button id="ride-show-scenes" type="button" class="ride-button" aria-controls="ride-scene-list" aria-pressed="false">位点演出</button>
+    <div class="ride-panel-options" role="group" aria-label="控制台内容" data-en-label="Control categories">
+      <button id="ride-show-actions" type="button" class="ride-button" aria-controls="ride-command-list" aria-pressed="true" data-en-text="Actions & View">动作与视角</button>
+      <button id="ride-show-scenes" type="button" class="ride-button" aria-controls="ride-scene-list" aria-pressed="false" data-en-text="Film Scenes">位点演出</button>
     </div>
     <div id="ride-panel-body">
       <div id="ride-command-list"></div>
@@ -187,10 +195,13 @@ body.ride-active #hud{bottom:66px}
     </div>
   </section>
 </div>
-<section id="ride-scene" class="ride-glass" lang="zh-CN" aria-labelledby="ride-scene-title" hidden>
+<section id="ride-scene" class="ride-glass" aria-labelledby="ride-scene-title" hidden>
   <div><h2 id="ride-scene-title">位点演出</h2><p id="ride-scene-detail" hidden></p></div>
-  <button type="button" class="ride-button" data-ride-action="stopScene" aria-keyshortcuts="Escape">返回骑行 <kbd class="ride-key" aria-hidden="true">Esc</kbd></button>
-  <progress id="ride-scene-progress" max="1" aria-label="演出进度" hidden></progress>
+  <div id="ride-scene-actions">
+    <button type="button" class="ride-button" data-language-toggle lang="en" title="Switch to English" aria-label="Switch to English">EN</button>
+    <button type="button" class="ride-button" data-ride-action="stopScene" aria-keyshortcuts="Escape"><span data-en-text="Back to Ride">返回骑行</span> <kbd class="ride-key" aria-hidden="true">Esc</kbd></button>
+  </div>
+  <progress id="ride-scene-progress" max="1" aria-label="演出进度" data-en-label="Scene progress" hidden></progress>
 </section>
 <script>{{THREE}}</script>
 <script>

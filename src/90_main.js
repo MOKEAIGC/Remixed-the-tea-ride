@@ -42,7 +42,8 @@ const Studio = (() => { let floor; const cq = (Q.get('cam') || '').split(',').ma
 
 setTimeout(async () => {
   const bar = document.querySelector('#bar s'), st = document.getElementById('st'), ld = document.getElementById('ld');
-  try { await Main.init((k, n) => { if (bar) bar.style.width = (k * 100).toFixed(1) + '%'; if (st) st.textContent = n; }); } catch (e) { console.error('BOOT', e.stack || e); if (st) st.textContent = String(e.message || e); throw e; }
+  try { await Main.init(k => { if (bar) bar.style.width = (k * 100).toFixed(1) + '%'; }); }
+  catch (e) { console.error('BOOT', e.stack || e); if (st) st.textContent = I18n.t('场景加载失败', 'Could not load the scene'); throw e; }
   window.__INFO = { build: G.build, load: G.info.load, errors: G.errors };
   window.__dbg = { Main, Score, Path, Sky, Lan, LU, Post, Assets, G, get info() { return G.info; }, frame: t => Main.frameAt(t) };
   window.__renderFrame = n => { Studio.frame(n); Main.size(); Main.frameAt(Main.STUDIO && Studio.tFix !== null ? Studio.tFix : n / 60); return true; };

@@ -2,57 +2,57 @@
 
 const RideShow = (() => {
   const scenes = [
-    { id: 'opening', label: '开卷日出', detail: '敲版上色，日出后进入立体世界', start: 0, end: 7.2 },
-    { id: 'market', label: '集市巡游', detail: '穿过灯笼街，遇见长颈鹿和乌龟', start: 7.2, end: 24 },
-    { id: 'tea', label: '茶摊小憩', detail: '举杯、抿茶，切入茶杯蒸汽特写', start: 24, end: 28.2 },
-    { id: 'chase', label: '柠檬追逐', detail: '柠檬撞过一排杯碟，最后被鹈鹕接住', start: 28.2, end: 43.8 },
-    { id: 'pier', label: '夕阳码头', detail: '沿码头助跑，展开翅膀飞离木板', start: 43.8, end: 54.6 },
-    { id: 'lanternFlight', label: '穿越灯海', detail: '夜航过热气球和孔明灯，骑手空中喝茶', start: 54.6, end: 69.6 },
-    { id: 'lake', label: '月下落湖', detail: '俯冲、溅水、减速漂浮，湖上再喝一口', start: 69.6, end: 78.6 },
-    { id: 'closing', label: '收画落印', detail: '月湖变回木版画，印章落下', start: 78.6, end: Score.DUR },
+    { id: 'opening', label: ['开卷日出', 'Woodblock Sunrise'], detail: ['敲版上色，日出后进入立体世界', 'The print fills with colour and opens into a 3D world at sunrise.'], start: 0, end: 7.2 },
+    { id: 'market', label: ['集市巡游', 'Market Ride'], detail: ['穿过灯笼街，遇见长颈鹿和乌龟', 'Ride down Lantern Street past a giraffe and a turtle.'], start: 7.2, end: 24 },
+    { id: 'tea', label: ['茶摊小憩', 'Tea Break'], detail: ['举杯、抿茶，切入茶杯蒸汽特写', 'The rider takes a sip as the camera closes in on the steam.'], start: 24, end: 28.2 },
+    { id: 'chase', label: ['柠檬追逐', 'Lemon Chase'], detail: ['柠檬撞过一排杯碟，最后被鹈鹕接住', 'A lemon bounces through the crockery before the pelican catches it.'], start: 28.2, end: 43.8 },
+    { id: 'pier', label: ['夕阳码头', 'Sunset Takeoff'], detail: ['沿码头助跑，展开翅膀飞离木板', 'The pelican runs down the pier and takes flight.'], start: 43.8, end: 54.6 },
+    { id: 'lanternFlight', label: ['穿越灯海', 'Flight Through Lanterns'], detail: ['夜航过热气球和孔明灯，骑手空中喝茶', 'Fly past balloons and sky lanterns while the rider sips tea.'], start: 54.6, end: 69.6 },
+    { id: 'lake', label: ['月下落湖', 'Moonlit Splashdown'], detail: ['俯冲、溅水、减速漂浮，湖上再喝一口', 'Dive, splash down and drift on the lake with another sip of tea.'], start: 69.6, end: 78.6 },
+    { id: 'closing', label: ['收画落印', 'Sealing the Print'], detail: ['月湖变回木版画，印章落下', 'The moonlit lake becomes a print again and receives its seal.'], start: 78.6, end: Score.DUR },
   ].map((scene, i) => ({ ...scene, key: String(i + 1), code: `Digit${i + 1}` }));
 
   const groups = [
-    { label: '移动与飞行', actions: [
-      { id: 'forward', label: '前进', key: 'W / ↑', hold: true },
-      { id: 'back', label: '后退／减速', key: 'S / ↓', hold: true },
-      { id: 'left', label: '左转', key: 'A / ←', hold: true },
-      { id: 'right', label: '右转', key: 'D / →', hold: true },
-      { id: 'takeoff', label: '展开翅膀', key: '空格', code: 'Space' },
-      { id: 'land', label: '自动降落', key: 'C', code: 'KeyC' },
-      { id: 'ascend', label: '爬升', key: 'Z', code: 'KeyZ', hold: true },
-      { id: 'descend', label: '下降', key: 'X', code: 'KeyX', hold: true },
-      { id: 'sprint', label: '加速', key: 'Shift', hold: true },
-      { id: 'reset', label: '返回起点', key: 'R', code: 'KeyR' },
+    { label: ['移动与飞行', 'Movement & Flight'], actions: [
+      { id: 'forward', label: ['前进', 'Move forward'], key: 'W / ↑', hold: true },
+      { id: 'back', label: ['后退／减速', 'Reverse / brake'], key: 'S / ↓', hold: true },
+      { id: 'left', label: ['左转', 'Turn left'], key: 'A / ←', hold: true },
+      { id: 'right', label: ['右转', 'Turn right'], key: 'D / →', hold: true },
+      { id: 'takeoff', label: ['展开翅膀', 'Take off'], key: ['空格', 'Space'], code: 'Space' },
+      { id: 'land', label: ['自动降落', 'Auto-land'], key: 'C', code: 'KeyC' },
+      { id: 'ascend', label: ['爬升', 'Climb'], key: 'Z', code: 'KeyZ', hold: true },
+      { id: 'descend', label: ['下降', 'Descend'], key: 'X', code: 'KeyX', hold: true },
+      { id: 'sprint', label: ['加速', 'Boost'], key: 'Shift', hold: true },
+      { id: 'reset', label: ['返回起点', 'Reset ride'], key: 'R', code: 'KeyR' },
     ] },
-    { label: '骑手与道具', actions: [
-      { id: 'honk', label: '鹈鹕鸣叫', key: 'Q', code: 'KeyQ' },
-      { id: 'sip', label: '喝茶', key: 'E', code: 'KeyE' },
-      { id: 'lemon', label: '抛柠檬', key: 'F', code: 'KeyF' },
-      { id: 'lemonRain', label: '柠檬雨', key: 'Shift + F', code: 'KeyF', shift: true },
-      { id: 'lantern', label: '放一盏孔明灯', key: 'L', code: 'KeyL' },
-      { id: 'lanterns', label: '放一组孔明灯', key: 'Shift + L', code: 'KeyL', shift: true },
+    { label: ['骑手与道具', 'Rider & Props'], actions: [
+      { id: 'honk', label: ['鹈鹕鸣叫', 'Honk'], key: 'Q', code: 'KeyQ' },
+      { id: 'sip', label: ['喝茶', 'Sip tea'], key: 'E', code: 'KeyE' },
+      { id: 'lemon', label: ['抛柠檬', 'Throw a lemon'], key: 'F', code: 'KeyF' },
+      { id: 'lemonRain', label: ['柠檬雨', 'Lemon rain'], key: 'Shift + F', code: 'KeyF', shift: true },
+      { id: 'lantern', label: ['放一盏孔明灯', 'Release a sky lantern'], key: 'L', code: 'KeyL' },
+      { id: 'lanterns', label: ['放一组孔明灯', 'Release sky lanterns'], key: 'Shift + L', code: 'KeyL', shift: true },
     ] },
-    { label: '镜头与画面', actions: [
-      { id: 'style', label: '立体／木版画', key: 'P', code: 'KeyP' },
-      { id: 'time', label: '白昼／落日／月夜', key: 'T', code: 'KeyT' },
-      { id: 'camera', label: '切换视角', key: 'V', code: 'KeyV' },
-      { id: 'fullscreen', label: '全屏', key: 'O', code: 'KeyO' },
+    { label: ['镜头与画面', 'Camera & Look'], actions: [
+      { id: 'style', label: ['立体／木版画', '3D / woodblock'], key: 'P', code: 'KeyP' },
+      { id: 'time', label: ['白昼／落日／月夜', 'Cycle time of day'], key: 'T', code: 'KeyT' },
+      { id: 'camera', label: ['切换视角', 'Switch camera'], key: 'V', code: 'KeyV' },
+      { id: 'fullscreen', label: ['全屏', 'Full screen'], key: 'O', code: 'KeyO' },
     ] },
-    { label: '音乐', actions: [
-      { id: 'drum', label: '敲鼓', key: 'B', code: 'KeyB' },
-      { id: 'riff', label: '弹一段筝', key: 'Y', code: 'KeyY' },
-      { id: 'score', label: '展开乐谱', key: 'N', code: 'KeyN' },
-      { id: 'mute', label: '切换静音', key: 'M', code: 'KeyM' },
-      { id: 'pause', label: '暂停／继续', key: 'I', code: 'KeyI' },
-      ...['一', '二', '三', '四', '五'].map((note, i) => ({ id: `note${i}`, label: `第${note}弦`, key: `Shift + ${i + 1}`, code: `Digit${i + 1}`, shift: true })),
+    { label: ['音乐', 'Music'], actions: [
+      { id: 'drum', label: ['敲鼓', 'Play drum'], key: 'B', code: 'KeyB' },
+      { id: 'riff', label: ['弹一段筝', 'Play a koto riff'], key: 'Y', code: 'KeyY' },
+      { id: 'score', label: ['展开乐谱', 'Toggle score'], key: 'N', code: 'KeyN' },
+      { id: 'mute', label: ['切换静音', 'Toggle sound'], key: 'M', code: 'KeyM' },
+      { id: 'pause', label: ['暂停／继续', 'Pause / resume'], key: 'I', code: 'KeyI' },
+      ...['一', '二', '三', '四', '五'].map((note, i) => ({ id: `note${i}`, label: [`第${note}弦`, `String ${i + 1}`], key: `Shift + ${i + 1}`, code: `Digit${i + 1}`, shift: true })),
     ] },
-    { label: '动作组合', actions: [
-      { id: 'teaCombo', label: '茶摊迎客', key: 'U', code: 'KeyU', detail: '到茶摊，弹筝、喝茶，再鸣叫一声' },
-      { id: 'pierCombo', label: '码头助跑起飞', key: 'G', code: 'KeyG', detail: '到码头，切换落日，鸣叫、助跑、起飞' },
-      { id: 'lanternCombo', label: '夜航放灯', key: 'J', code: 'KeyJ', detail: '切换月夜，起飞，分批放飞孔明灯' },
-      { id: 'landingCombo', label: '降落奉茶', key: 'K', code: 'KeyK', detail: '接地或落水后，喝茶并放一盏灯' },
-      { id: 'cancelCombo', label: '结束组合', key: 'Esc' },
+    { label: ['动作组合', 'Action Combos'], actions: [
+      { id: 'teaCombo', label: ['茶摊迎客', 'Tea Stall Welcome'], key: 'U', code: 'KeyU', detail: ['到茶摊，弹筝、喝茶，再鸣叫一声', 'Visit the tea stall, play koto, sip tea and honk.'] },
+      { id: 'pierCombo', label: ['码头助跑起飞', 'Pier Takeoff'], key: 'G', code: 'KeyG', detail: ['到码头，切换落日，鸣叫、助跑、起飞', 'Go to the pier at sunset, honk, run and take off.'] },
+      { id: 'lanternCombo', label: ['夜航放灯', 'Moonlit Lantern Flight'], key: 'J', code: 'KeyJ', detail: ['切换月夜，起飞，分批放飞孔明灯', 'Take flight by moonlight and release sky lanterns in waves.'] },
+      { id: 'landingCombo', label: ['降落奉茶', 'Land for Tea'], key: 'K', code: 'KeyK', detail: ['接地或落水后，喝茶并放一盏灯', 'Land on the ground or water, sip tea and release a lantern.'] },
+      { id: 'cancelCombo', label: ['结束组合', 'Stop combo'], key: 'Esc' },
     ] },
   ];
 
@@ -62,7 +62,8 @@ const RideShow = (() => {
   }
   const actionFor = event => (event.shiftKey && actionLookup.get(`shift:${event.code}`)) || actionLookup.get(event.code);
 
-  const times = [25, 49, 68], timeLabels = ['白昼', '落日', '月夜'];
+  const times = [25, 49, 68], timeLabels = [['白昼', 'Daylight'], ['落日', 'Sunset'], ['月夜', 'Moonlight']];
+  const styles = [['立体', '3D'], ['木版画', 'Woodblock']];
   let timeIndex = 0, time = times[0], print = false, printBlend = 0;
   function setTime(index) { timeIndex = index; }
   function styleFrame(dt) {
@@ -132,9 +133,9 @@ const RideShow = (() => {
   return {
     scenes, groups, actionFor, startCombo, stepCombo, cancelCombo, setTime, styleFrame,
     cycleTime() { setTime((timeIndex + 1) % times.length); return timeLabels[timeIndex]; },
-    cycleStyle() { print = !print; return print ? '木版画' : '立体'; },
+    cycleStyle() { print = !print; return styles[Number(print)]; },
     view(ctx) { return { ...Ride.view(ctx), tod: time, lanGain: lerp(.35, 1.15, sm(55, 67, time)) }; },
-    get label() { return `${print ? '木版画' : '立体'} · ${timeLabels[timeIndex]}`; },
-    get combo() { return active?.label; },
+    get label() { return `${I18n.text(styles[Number(print)])} · ${I18n.text(timeLabels[timeIndex])}`; },
+    get combo() { return I18n.text(active?.label); },
   };
 })();
